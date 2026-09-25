@@ -64,6 +64,22 @@ export async function signOut(): Promise<void> {
 }
 
 /**
+ * Send a Supabase Auth recovery email without exposing credentials to email recipients.
+ */
+export async function sendPasswordSetupEmail(email: string, redirectTo: string): Promise<void> {
+  const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo })
+  if (error) throw error
+}
+
+/**
+ * Set a new password from a recovery session created by Supabase Auth.
+ */
+export async function updatePassword(password: string): Promise<void> {
+  const { error } = await supabase.auth.updateUser({ password })
+  if (error) throw error
+}
+
+/**
  * Restore an existing session (called on app mount).
  * Returns null if no valid session exists.
  */

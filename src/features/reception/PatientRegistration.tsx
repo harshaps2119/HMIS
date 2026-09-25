@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { createPatient, provisionPatientAccount } from '../../services/patientService'
+import { sendPasswordSetupEmail } from '../../services/authService'
 import { logAction } from '../../services/auditService'
 import { useAuth } from '../../contexts/AuthContext'
 import { getFirebaseErrorMessage } from '../../utils/errorUtils'
@@ -17,6 +18,7 @@ import {
   RefreshCw,
   ShieldCheck,
   ExternalLink,
+  Mail,
 } from 'lucide-react'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 
@@ -75,6 +77,8 @@ export default function PatientRegistration() {
     email: string
     password: string
   } | null>(null)
+  const [sendCredentialsState, setSendCredentialsState] = useState<'idle' | 'sending' | 'sent' | 'failed'>('idle')
+  const [sendCredentialsError, setSendCredentialsError] = useState('')
 
   const handleContinue = (e: React.FormEvent) => {
     e.preventDefault()
@@ -208,6 +212,26 @@ export default function PatientRegistration() {
     const text = `DentalCare Patient Portal Credentials:\nPatient Name: ${credentialsModal.name}\nUHID / Mobile: ${credentialsModal.uhid}\nLogin Email: ${credentialsModal.email}\nInitial Password: ${credentialsModal.password}\nPortal Link: ${window.location.origin}/login?portal=patient`
     navigator.clipboard.writeText(text)
     toast.success('Credentials copied to clipboard!')
+  }
+
+  const handleSendCredentials = async () => {
+    if (!credentialsModal || sendCredentialsState === 'sending') return
+
+    setSendCredentialsState('sending')
+    setSendCredentialsError('')
+    try {
+      await sendPasswordSetupEmail(
+        credentialsModal.email,
+        `${window.location.origin}/set-password?portal=patient`
+      )
+      setSendCredentialsState('sent')
+      toast.success(`Password setup instructions sent to ${credentialsModal.email}.`)
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unable to send the password setup email.'
+      setSendCredentialsState('failed')
+      setSendCredentialsError(message)
+      toast.error('Could not send patient credentials.')
+    }
   }
 
   return (
@@ -553,8 +577,19 @@ export default function PatientRegistration() {
             </div>
 
             <p className="text-xs text-gray-500">
-              Please share these credentials with the patient. They can now sign in at the <strong>Patient Portal</strong>.
+              Share the temporary password manually or send a secure password setup link. The patient can sign in at the <strong>Patient Portal</strong>.
             </p>
+
+            {sendCredentialsState === 'sent' && (
+              <p className="text-xs text-green-700 bg-green-50 border border-green-200 rounded-lg p-2">
+                Password setup instructions were sent to {credentialsModal.email}.
+              </p>
+            )}
+            {sendCredentialsState === 'failed' && (
+              <p className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg p-2">
+                {sendCredentialsError || 'Unable to send password setup instructions.'}
+              </p>
+            )}
 
             <div className="flex flex-col sm:flex-row gap-2 pt-2">
               <button
@@ -563,6 +598,15 @@ export default function PatientRegistration() {
                 className="btn-secondary text-xs flex-1 flex items-center justify-center gap-1.5"
               >
                 <Copy className="h-4 w-4" /> Copy Credentials
+              </button>
+              <button
+                type="button"
+                onClick={handleSendCredentials}
+                disabled={sendCredentialsState === 'sending' || sendCredentialsState === 'sent'}
+                className="btn-secondary text-xs flex-1 flex items-center justify-center gap-1.5"
+              >
+                <Mail className="h-4 w-4" />
+                {sendCredentialsState === 'sending' ? 'Sending...' : sendCredentialsState === 'sent' ? 'Credentials Sent' : 'Send Credentials to Patient'}
               </button>
               <button
                 type="button"

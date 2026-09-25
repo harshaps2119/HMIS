@@ -3,6 +3,7 @@ import { AuthProvider } from './contexts/AuthContext'
 import ProtectedRoute from './components/routing/ProtectedRoute'
 import LoginPage from './pages/LoginPage'
 import LandingPage from './pages/LandingPage'
+import PasswordSetupPage from './pages/PasswordSetupPage'
 
 // Reception
 import ReceptionLayout from './layouts/ReceptionLayout'
@@ -40,6 +41,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/set-password" element={<PasswordSetupPage />} />
 
         {/* Reception Routes */}
         <Route path="/reception" element={
