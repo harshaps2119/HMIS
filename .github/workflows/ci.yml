@@ -1,0 +1,47 @@
+name: HMIS CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  static:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run test:migrations
+      - run: npm run test:workflows
+      - run: npx tsc --noEmit
+      - run: npm run lint
+      - run: npm run build
+
+  live-auth:
+    if: ${{ secrets.SUPABASE_URL != '' && secrets.SUPABASE_ANON_KEY != '' && secrets.SUPABASE_SERVICE_ROLE_KEY != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Run live Supabase auth workflow
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          E2E_ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL }}
+          E2E_ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD }}
+          E2E_DOCTOR_EMAIL: ${{ secrets.E2E_DOCTOR_EMAIL }}
+          E2E_DOCTOR_PASSWORD: ${{ secrets.E2E_DOCTOR_PASSWORD }}
+          E2E_RAHUL_EMAIL: ${{ secrets.E2E_RAHUL_EMAIL }}
+          E2E_RAHUL_PASSWORD: ${{ secrets.E2E_RAHUL_PASSWORD }}
+          E2E_POOJA_EMAIL: ${{ secrets.E2E_POOJA_EMAIL }}
+          E2E_POOJA_PASSWORD: ${{ secrets.E2E_POOJA_PASSWORD }}
+          E2E_NEW_PATIENT_PASSWORD: ${{ secrets.E2E_NEW_PATIENT_PASSWORD }}
+        run: npm run test:live-auth
