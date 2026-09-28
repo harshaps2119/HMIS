@@ -6,6 +6,7 @@ functions/lib
 dist
 dist-ssr
 *.local
+scratch/
 
 # Environment variables - NEVER commit these
 .env

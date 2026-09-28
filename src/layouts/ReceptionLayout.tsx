@@ -51,11 +51,11 @@ export default function ReceptionLayout() {
 
       {/* Sidebar */}
       <aside
-        className={`fixed top-0 left-0 h-full w-64 bg-white border-r border-gray-200 z-30 transform transition-transform lg:translate-x-0 lg:static lg:z-auto ${
+        className={`fixed top-0 left-0 h-full w-64 bg-white border-r border-gray-200 z-30 flex flex-col transform transition-transform lg:translate-x-0 lg:static lg:z-auto ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        <div className="flex items-center gap-3 px-6 py-5 border-b border-gray-200">
+        <div className="flex items-center gap-3 px-6 py-5 border-b border-gray-200 shrink-0">
           <div className="w-10 h-10 rounded-xl bg-white border border-gray-200 p-1 flex items-center justify-center shrink-0 shadow-sm">
             <img src={CLINIC_CONFIG.logo} alt={CLINIC_CONFIG.name} className="w-full h-full object-contain rounded-lg" />
           </div>
@@ -65,7 +65,7 @@ export default function ReceptionLayout() {
           </div>
         </div>
 
-        <nav className="p-4 space-y-1">
+        <nav className="p-4 space-y-1 flex-1 overflow-y-auto">
           {navLinks.map(({ to, icon: Icon, label }) => (
             <NavLink
               key={to}
@@ -108,7 +108,7 @@ export default function ReceptionLayout() {
           )}
         </nav>
 
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200">
+        <div className="p-4 border-t border-gray-200 shrink-0 mt-auto bg-white">
           <button
             onClick={handleSignOut}
             className="sidebar-link sidebar-link-inactive w-full text-red-600 hover:bg-red-50"
