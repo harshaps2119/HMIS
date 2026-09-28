@@ -4,7 +4,7 @@ import { UserProfile } from '../types'
 import {
   AuthUser,
   getCurrentUser,
-  subscribeToAuthState,
+  subscribeToAuthStateWithEvent,
   signOut,
 } from '../services/authService'
 
@@ -13,6 +13,7 @@ interface AuthContextType {
   userProfile: UserProfile | null
   loading: boolean
   profileLoading: boolean
+  isPasswordRecovery: boolean
   refreshProfile: (user?: AuthUser | null) => Promise<UserProfile | null>
   setUserProfileDirectly: (profile: UserProfile | null) => void
 }
@@ -22,6 +23,7 @@ const AuthContext = createContext<AuthContextType>({
   userProfile: null,
   loading: true,
   profileLoading: false,
+  isPasswordRecovery: false,
   refreshProfile: async () => null,
   setUserProfileDirectly: () => {},
 })
@@ -31,6 +33,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const [profileLoading, setProfileLoading] = useState(false)
+  // True when Supabase has signalled a PASSWORD_RECOVERY event.
+  // While true, AuthContext will NOT load profiles or auto-redirect.
+  // PasswordSetupPage is solely responsible for this session.
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState(false)
 
   const loadProfile = async (user: AuthUser): Promise<UserProfile | null> => {
     setProfileLoading(true)
@@ -69,19 +75,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let mounted = true
-    const handleUser = async (user: AuthUser | null) => {
+
+    const handleUserWithEvent = async (event: string, user: AuthUser | null) => {
       if (!mounted) return
+
+      // PASSWORD_RECOVERY means Supabase has processed the reset link and
+      // created a temporary recovery session. We must NOT load a profile or
+      // auto-redirect — the PasswordSetupPage handles the entire flow.
+      if (event === 'PASSWORD_RECOVERY') {
+        setIsPasswordRecovery(true)
+        setCurrentUser(user)
+        if (mounted) setLoading(false)
+        return
+      }
+
+      // After the password is updated, PasswordSetupPage calls signOut().
+      // That fires SIGNED_OUT. Clear recovery flag and treat normally.
+      if (event === 'SIGNED_OUT') {
+        setIsPasswordRecovery(false)
+        setCurrentUser(null)
+        setUserProfile(null)
+        if (mounted) setLoading(false)
+        return
+      }
+
       setCurrentUser(user)
       if (user) await loadProfile(user)
       else setUserProfile(null)
       if (mounted) setLoading(false)
     }
 
-    getCurrentUser().then(handleUser).catch(error => {
+    // Initialise: restore any existing session (non-recovery).
+    // getSession() never returns a PASSWORD_RECOVERY event directly —
+    // that only comes through onAuthStateChange — so we treat the initial
+    // session as a normal SIGNED_IN or null.
+    getCurrentUser().then(user => {
+      if (!mounted) return
+      handleUserWithEvent('INITIAL_SESSION', user)
+    }).catch(error => {
       console.error('Failed to restore authentication session:', error)
-      handleUser(null)
+      if (mounted) handleUserWithEvent('INITIAL_SESSION', null)
     })
-    const unsubscribe = subscribeToAuthState(handleUser)
+
+    const unsubscribe = subscribeToAuthStateWithEvent(handleUserWithEvent)
     return () => {
       mounted = false
       unsubscribe()
@@ -95,6 +131,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         userProfile,
         loading,
         profileLoading,
+        isPasswordRecovery,
         refreshProfile,
         setUserProfileDirectly,
       }}

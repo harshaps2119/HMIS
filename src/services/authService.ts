@@ -64,9 +64,19 @@ export async function signOut(): Promise<void> {
 }
 
 /**
- * Send a Supabase Auth recovery email without exposing credentials to email recipients.
+ * Send a Supabase Auth recovery email — used by clinic staff to provision a patient.
+ * redirectTo must be the /set-password URL.
  */
 export async function sendPasswordSetupEmail(email: string, redirectTo: string): Promise<void> {
+  const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo })
+  if (error) throw error
+}
+
+/**
+ * Send a Supabase Auth password-reset email — patient-facing self-service.
+ * redirectTo must be the /set-password URL so the recovery flow lands there.
+ */
+export async function sendPasswordResetEmail(email: string, redirectTo: string): Promise<void> {
   const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo })
   if (error) throw error
 }
@@ -97,6 +107,25 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
 export function subscribeToAuthState(callback: (user: AuthUser | null) => void): () => void {
   const { data } = supabase.auth.onAuthStateChange((_event, session) => {
     callback(session ? mapUser(session.user) : null)
+  })
+  return () => data.subscription.unsubscribe()
+}
+
+/**
+ * Subscribe to auth state changes, exposing the raw event name alongside the user.
+ * Use this in PasswordSetupPage to detect the PASSWORD_RECOVERY event specifically.
+ * The PASSWORD_RECOVERY event fires when Supabase processes the recovery token
+ * from the URL hash (#access_token=...&type=recovery) and establishes a
+ * temporary recovery session. Without waiting for this event, calling updateUser()
+ * may fail because no recovery session exists yet.
+ *
+ * Returns an unsubscribe function.
+ */
+export function subscribeToAuthStateWithEvent(
+  callback: (event: string, user: AuthUser | null) => void
+): () => void {
+  const { data } = supabase.auth.onAuthStateChange((event, session) => {
+    callback(event, session ? mapUser(session.user) : null)
   })
   return () => data.subscription.unsubscribe()
 }

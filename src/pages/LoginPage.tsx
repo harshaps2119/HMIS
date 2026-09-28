@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import { signIn, signOut, getAuthErrorMessage } from '../services/authService'
+import { signIn, signOut, getAuthErrorMessage, sendPasswordResetEmail } from '../services/authService'
 import { getUserProfile } from '../services/userService'
 import { useAuth } from '../contexts/AuthContext'
 import { UserRole } from '../types'
@@ -13,6 +13,8 @@ import {
   ShieldCheck,
   Users,
   ArrowLeft,
+  KeyRound,
+  CheckCircle2,
 } from 'lucide-react'
 import LoadingSpinner from '../components/ui/LoadingSpinner'
 import { CLINIC_NAME, CLINIC_ADDRESS, CLINIC_PHONE } from '../utils/constants'
@@ -41,6 +43,13 @@ export default function LoginPage() {
   const [error, setError] = useState(
     isDeactivated ? 'Your account has been deactivated. Please contact the clinic administrator.' : ''
   )
+
+  // Forgot Password state (patient portal only)
+  const [showForgotPassword, setShowForgotPassword] = useState(false)
+  const [resetEmail, setResetEmail] = useState('')
+  const [resetLoading, setResetLoading] = useState(false)
+  const [resetSent, setResetSent] = useState(false)
+  const [resetError, setResetError] = useState('')
 
   useEffect(() => {
     if (isDeactivated) {
@@ -100,6 +109,31 @@ export default function LoginPage() {
       setError(getAuthErrorMessage(authError))
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleForgotPassword = async (event: React.FormEvent) => {
+    event.preventDefault()
+    setResetError('')
+
+    if (!resetEmail.trim() || !resetEmail.includes('@')) {
+      setResetError('Enter a valid email address.')
+      return
+    }
+
+    setResetLoading(true)
+    try {
+      // redirectTo must point to /set-password — Supabase will append the
+      // recovery token as a hash fragment: /set-password#access_token=...&type=recovery
+      const redirectTo = `${window.location.origin}/set-password`
+      await sendPasswordResetEmail(resetEmail.trim(), redirectTo)
+      setResetSent(true)
+    } catch (err: unknown) {
+      if (import.meta.env.DEV) console.error('[forgotPassword] error:', err)
+      // Always show a generic message to prevent email enumeration.
+      setResetSent(true)
+    } finally {
+      setResetLoading(false)
     }
   }
 
@@ -237,6 +271,25 @@ export default function LoginPage() {
                 <span>Sign In to {isStaffPortal ? 'Staff Portal' : 'Patient Portal'}</span>
               )}
             </button>
+
+            {/* Forgot Password — patient portal only */}
+            {!isStaffPortal && !showForgotPassword && (
+              <div className="text-center">
+                <button
+                  type="button"
+                  id="forgot-password-trigger"
+                  onClick={() => {
+                    setResetEmail(email) // pre-fill with whatever they typed
+                    setResetSent(false)
+                    setResetError('')
+                    setShowForgotPassword(true)
+                  }}
+                  className="text-xs text-cyan-700 hover:text-cyan-900 font-medium underline underline-offset-2 transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-400 rounded"
+                >
+                  Forgot Password?
+                </button>
+              </div>
+            )}
           </form>
 
           {/* Informational Notice inside card */}
@@ -255,6 +308,92 @@ export default function LoginPage() {
             )}
           </div>
         </div>
+
+        {/* Forgot Password Panel — renders below the login card, patient portal only */}
+        {!isStaffPortal && showForgotPassword && (
+          <div className="mt-4 bg-white rounded-3xl shadow-xl border border-cyan-200/80 p-6">
+            {resetSent ? (
+              /* Success state */
+              <div className="text-center">
+                <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-600 mb-3">
+                  <CheckCircle2 className="h-6 w-6" />
+                </div>
+                <h3 className="text-sm font-bold text-gray-900 mb-1">Check Your Email</h3>
+                <p className="text-xs text-gray-500 mb-4">
+                  If <span className="font-medium text-gray-700">{resetEmail}</span> is registered,
+                  you will receive a password reset link shortly. Click the link in the email to set a new password.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowForgotPassword(false)
+                    setResetSent(false)
+                    setResetEmail('')
+                  }}
+                  className="text-xs text-cyan-700 hover:text-cyan-900 font-semibold underline underline-offset-2 transition-colors"
+                >
+                  Back to Sign In
+                </button>
+              </div>
+            ) : (
+              /* Reset request form */
+              <>
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-cyan-100 text-cyan-700">
+                    <KeyRound className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-gray-900">Reset Your Password</h3>
+                    <p className="text-xs text-gray-500">Enter your registered email to receive a reset link.</p>
+                  </div>
+                </div>
+
+                {resetError && (
+                  <div className="mb-3 flex items-start gap-2 p-2.5 rounded-xl bg-red-50 border border-red-200">
+                    <AlertCircle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
+                    <p className="text-xs text-red-700">{resetError}</p>
+                  </div>
+                )}
+
+                <form onSubmit={handleForgotPassword} className="space-y-3">
+                  <div>
+                    <label className="form-label text-xs" htmlFor="reset-email">Email Address</label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                      <input
+                        id="reset-email"
+                        type="email"
+                        value={resetEmail}
+                        onChange={e => setResetEmail(e.target.value)}
+                        className="form-input pl-10 text-xs"
+                        placeholder="patient@example.com"
+                        autoComplete="email"
+                        required
+                        autoFocus
+                      />
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowForgotPassword(false)}
+                      className="flex-1 py-2.5 px-4 rounded-xl border border-gray-200 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={resetLoading}
+                      className="flex-1 py-2.5 px-4 rounded-xl bg-cyan-700 hover:bg-cyan-800 text-xs font-semibold text-white shadow-md transition-all flex items-center justify-center gap-1.5"
+                    >
+                      {resetLoading ? <LoadingSpinner size="sm" /> : 'Send Reset Link'}
+                    </button>
+                  </div>
+                </form>
+              </>
+            )}
+          </div>
+        )}
 
         {/* Security badge below card */}
         <div className="mt-6 text-center space-y-1">
