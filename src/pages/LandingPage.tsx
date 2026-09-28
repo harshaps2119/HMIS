@@ -26,15 +26,19 @@ const roleDashboard: Record<UserRole, string> = {
 
 export default function LandingPage() {
   const navigate = useNavigate()
-  const { currentUser, userProfile, loading } = useAuth()
+  const { currentUser, userProfile, loading, isPasswordRecovery } = useAuth()
 
-  // If already authenticated and profile loaded, auto-route to authorized dashboard
+  // If in password recovery, redirect to /set-password, never to a dashboard
   useEffect(() => {
+    if (isPasswordRecovery) {
+      navigate('/set-password', { replace: true })
+      return
+    }
     if (!loading && currentUser && userProfile) {
       const target = roleDashboard[userProfile.role] || '/patient/dashboard'
       navigate(target, { replace: true })
     }
-  }, [currentUser, userProfile, loading, navigate])
+  }, [currentUser, userProfile, loading, isPasswordRecovery, navigate])
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-teal-50/30 to-sky-50 flex flex-col justify-between text-gray-800">
@@ -42,15 +46,15 @@ export default function LandingPage() {
       <header className="w-full bg-white/80 backdrop-blur-md border-b border-gray-200 sticky top-0 z-10 shadow-sm">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-600 to-teal-800 flex items-center justify-center text-white shadow-md">
-              <Stethoscope className="h-6 w-6" aria-hidden="true" />
+            <div className="w-10 h-10 rounded-xl bg-white border border-gray-200 p-1 flex items-center justify-center shrink-0 shadow-sm">
+              <img src="/logo.jpg" alt={CLINIC_NAME} className="w-full h-full object-contain rounded-lg" />
             </div>
             <div>
               <span className="text-lg font-bold text-gray-900 tracking-tight block leading-tight">
                 {CLINIC_NAME}
               </span>
               <span className="text-xs text-teal-700 font-medium tracking-wide uppercase">
-                Hospital Management System
+                Dr. Hemanth Kumar · BDS, MDS – Orthodontics
               </span>
             </div>
           </div>
@@ -212,9 +216,9 @@ export default function LandingPage() {
       <footer className="w-full border-t border-gray-200 bg-white/70 py-6 text-xs text-gray-500">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
           <div>
-            <p className="font-semibold text-gray-700">{CLINIC_NAME}</p>
-            <p className="text-gray-400 mt-0.5">
-              {CLINIC_ADDRESS} &bull; Contact: {CLINIC_PHONE} &bull; {CLINIC_EMAIL}
+            <p className="font-semibold text-gray-800">{CLINIC_NAME} &bull; Dr. Hemanth Kumar (BDS, MDS – Orthodontics)</p>
+            <p className="text-gray-500 mt-0.5">
+              {CLINIC_ADDRESS} &bull; Contact: {CLINIC_PHONE}
             </p>
           </div>
           <div className="flex items-center gap-2 text-gray-400">

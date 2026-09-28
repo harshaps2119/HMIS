@@ -667,7 +667,7 @@ export default function StaffManagement() {
                     required
                     value={form.email}
                     onChange={e => setForm(prev => ({ ...prev, email: e.target.value }))}
-                    placeholder="staff.name@dentalcare.com"
+                    placeholder="staff.name@prasaddentalcare.com"
                     className="form-input pl-9 text-xs"
                   />
                 </div>

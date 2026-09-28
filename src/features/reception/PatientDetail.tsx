@@ -4,11 +4,13 @@ import toast from 'react-hot-toast'
 import { getPatient, provisionPatientAccount } from '../../services/patientService'
 import { getPatientAppointments } from '../../services/appointmentService'
 import { getPatientUserByPhone } from '../../services/userService'
+import { sendPatientIdEmail } from '../../services/emailService'
+import { useAuth } from '../../contexts/AuthContext'
 import { Patient, Appointment, UserProfile } from '../../types'
 import { formatDate, formatTime } from '../../utils/dateUtils'
 import {
   Phone, Mail, MapPin, AlertTriangle, Calendar,
-  ArrowLeft, Plus, ShieldCheck, Key, Copy, RefreshCw, CheckCircle,
+  ArrowLeft, Plus, ShieldCheck, Key, Copy, RefreshCw, CheckCircle, Hash,
 } from 'lucide-react'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import ErrorState from '../../components/ui/ErrorState'
@@ -23,10 +25,12 @@ function generateTemporaryPassword(phoneDigits: string) {
 export default function PatientDetail() {
   const { patientRecordId } = useParams<{ patientRecordId: string }>()
   const navigate = useNavigate()
+  const { userProfile, currentUser } = useAuth()
   const [patient, setPatient] = useState<Patient | null>(null)
   const [portalUser, setPortalUser] = useState<UserProfile | null>(null)
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [loading, setLoading] = useState(true)
+  const [sendingEmail, setSendingEmail] = useState(false)
   const [error, setError] = useState('')
 
   // Provisioning modal state
@@ -38,6 +42,7 @@ export default function PatientDetail() {
   const [createdCredentials, setCreatedCredentials] = useState<{
     email: string
     password: string
+    patientId: string
   } | null>(null)
 
   const loadPatientData = async () => {
@@ -70,6 +75,50 @@ export default function PatientDetail() {
     loadPatientData()
   }, [patientRecordId])
 
+  const handleCopyPatientId = () => {
+    if (!patient) return
+    const idToCopy = patient.patientId || patient.uhid
+    navigator.clipboard.writeText(idToCopy)
+    toast.success(`Patient ID ${idToCopy} copied to clipboard!`)
+  }
+
+  const handleResendPatientIdEmail = async () => {
+    if (!patient) return
+    if (!patient.email) {
+      toast.error('Patient has no email address on record.')
+      return
+    }
+
+    setSendingEmail(true)
+    try {
+      const displayId = patient.patientId || patient.uhid
+      const res = await sendPatientIdEmail(
+        {
+          patientName: patient.name,
+          email: patient.email,
+          patientId: displayId,
+          performedBy: currentUser && userProfile ? {
+            userId: currentUser.uid,
+            userRole: userProfile.role,
+            userName: userProfile.name,
+          } : undefined,
+        },
+        true
+      )
+
+      if (res.success) {
+        toast.success(`Patient ID welcome email sent to ${patient.email}!`)
+      } else {
+        toast.error(`Email delivery could not be completed: ${res.error || 'Check server configuration'}`)
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to send email'
+      toast.error(msg)
+    } finally {
+      setSendingEmail(false)
+    }
+  }
+
   const handleProvisionSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setProvisionError('')
@@ -86,7 +135,7 @@ export default function PatientDetail() {
 
     setProvisionLoading(true)
     try {
-      await provisionPatientAccount({
+      const result = await provisionPatientAccount({
         name: patient.name,
         phone: patient.phone,
         email: provisionEmail.trim(),
@@ -101,14 +150,38 @@ export default function PatientDetail() {
         emergencyContactName: patient.emergencyContactName,
       })
 
+      const displayId = result.patientId || patient.patientId || patient.uhid
+
       setCreatedCredentials({
         email: provisionEmail.trim(),
         password: provisionPassword,
+        patientId: displayId,
       })
+
+      // Send Patient ID welcome email
+      try {
+        await sendPatientIdEmail({
+          patientName: patient.name,
+          email: provisionEmail.trim(),
+          patientId: displayId,
+          performedBy: currentUser && userProfile ? {
+            userId: currentUser.uid,
+            userRole: userProfile.role,
+            userName: userProfile.name,
+          } : undefined,
+        })
+      } catch (err) {
+        console.warn('Welcome email delivery failed on provision:', err)
+      }
+
       toast.success('Patient Portal login provisioned successfully!')
-      // Refresh user profile
-      const updatedUser = await getPatientUserByPhone(patient.phone)
+      // Refresh user profile and patient info
+      const [updatedUser, updatedPatient] = await Promise.all([
+        getPatientUserByPhone(patient.phone),
+        getPatient(patient.id),
+      ])
       setPortalUser(updatedUser)
+      if (updatedPatient) setPatient(updatedPatient)
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Provisioning failed.'
       setProvisionError(msg)
@@ -119,13 +192,15 @@ export default function PatientDetail() {
 
   const handleCopyCredentials = () => {
     if (!createdCredentials || !patient) return
-    const text = `DentalCare Patient Portal Credentials:\nPatient Name: ${patient.name}\nUHID / Mobile: ${patient.uhid}\nLogin Email: ${createdCredentials.email}\nInitial Password: ${createdCredentials.password}\nPortal Link: ${window.location.origin}/login?portal=patient`
+    const text = `Prasad Dental Care Patient Portal Credentials:\nPatient Name: ${patient.name}\nPatient ID: ${createdCredentials.patientId}\nMobile: ${patient.phone}\nLogin Email: ${createdCredentials.email}\nInitial Password: ${createdCredentials.password}\nPortal Link: ${window.location.origin}/login?portal=patient`
     navigator.clipboard.writeText(text)
     toast.success('Credentials copied to clipboard!')
   }
 
   if (loading) return <LoadingSpinner className="py-16" />
   if (error || !patient) return <ErrorState message={error || 'Patient not found'} onRetry={() => navigate(-1)} />
+
+  const displayPatientId = patient.patientId || patient.uhid
 
   return (
     <div className="space-y-6">
@@ -135,7 +210,20 @@ export default function PatientDetail() {
         </button>
         <div className="flex-1">
           <h1 className="text-2xl font-bold text-gray-900">{patient.name}</h1>
-          <p className="text-sm text-gray-500 font-mono">UHID: {patient.uhid}</p>
+          <div className="flex items-center gap-2 mt-1">
+            <span className="inline-flex items-center gap-1 text-xs font-mono font-bold px-2.5 py-1 rounded-md bg-primary-100 text-primary-800 border border-primary-200">
+              <Hash className="h-3 w-3" />
+              Patient ID: {displayPatientId}
+            </span>
+            <button
+              type="button"
+              onClick={handleCopyPatientId}
+              className="text-xs text-gray-500 hover:text-primary-700 flex items-center gap-1 p-1 rounded hover:bg-gray-100 transition-colors"
+              title="Copy Patient ID"
+            >
+              <Copy className="h-3.5 w-3.5" /> Copy ID
+            </button>
+          </div>
         </div>
         <button
           onClick={() =>
@@ -169,15 +257,42 @@ export default function PatientDetail() {
             </div>
           </div>
 
+          {/* Prominent Patient ID Banner */}
+          <div className="flex items-center justify-between p-3 rounded-xl bg-primary-50 border border-primary-100">
+            <div>
+              <p className="text-[10px] uppercase tracking-wider text-primary-700 font-bold">Patient ID</p>
+              <p className="text-base font-mono font-extrabold text-primary-900">{displayPatientId}</p>
+            </div>
+            <button
+              type="button"
+              onClick={handleCopyPatientId}
+              className="btn-secondary text-xs px-2.5 py-1 flex items-center gap-1 bg-white hover:bg-primary-100 text-primary-800 border-primary-200"
+              title="Copy Patient ID"
+            >
+              <Copy className="h-3.5 w-3.5" /> Copy
+            </button>
+          </div>
+
           <div className="space-y-3 text-sm">
             <div className="flex items-center gap-2 text-gray-600">
               <Phone className="h-4 w-4 text-gray-400" />
-              {patient.phone}
+              <span className="font-mono">{patient.phone}</span>
             </div>
             {patient.email && (
-              <div className="flex items-center gap-2 text-gray-600">
-                <Mail className="h-4 w-4 text-gray-400" />
-                {patient.email}
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2 text-gray-600">
+                  <Mail className="h-4 w-4 text-gray-400 shrink-0" />
+                  <span className="truncate">{patient.email}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleResendPatientIdEmail}
+                  disabled={sendingEmail}
+                  className="w-full btn-secondary text-xs py-1.5 flex items-center justify-center gap-1.5 text-primary-700 hover:bg-primary-50 border-primary-200"
+                >
+                  <Mail className="h-3.5 w-3.5" />
+                  {sendingEmail ? 'Sending Email...' : 'Resend Patient ID Email'}
+                </button>
               </div>
             )}
             {patient.address && (
@@ -204,6 +319,9 @@ export default function PatientDetail() {
                 </div>
                 <p className="text-xs text-teal-700 truncate">
                   Account Email: {portalUser.email || patient.email || '—'}
+                </p>
+                <p className="text-[11px] text-teal-600">
+                  Patient logs in with Patient ID <strong>{displayPatientId}</strong>
                 </p>
               </div>
             ) : (
@@ -303,7 +421,7 @@ export default function PatientDetail() {
                   </div>
                   <div>
                     <h3 className="text-base font-bold text-gray-900">Provision Patient Portal Access</h3>
-                    <p className="text-xs text-gray-500">{patient.name} ({patient.uhid})</p>
+                    <p className="text-xs text-gray-500">{patient.name} ({displayPatientId})</p>
                   </div>
                 </div>
 
@@ -349,7 +467,7 @@ export default function PatientDetail() {
                   </div>
 
                   <p className="text-[11px] text-gray-500 pt-1">
-                    This will securely create an active account in Supabase Auth and link it with the patient's existing clinical record.
+                    This will securely create an active account in Supabase Auth and link it with the patient's record. The patient will be able to log in with Patient ID ({displayPatientId}) or email.
                   </p>
 
                   <div className="flex gap-2 pt-2">
@@ -384,6 +502,10 @@ export default function PatientDetail() {
 
                 <div className="p-4 rounded-xl bg-gray-50 border border-gray-200 space-y-2 text-xs">
                   <div className="flex justify-between py-1 border-b border-gray-200">
+                    <span className="text-gray-500">Patient ID:</span>
+                    <span className="font-mono font-bold text-primary-900">{createdCredentials.patientId}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-gray-200">
                     <span className="text-gray-500">Login Email:</span>
                     <span className="font-semibold text-teal-800">{createdCredentials.email}</span>
                   </div>
@@ -394,6 +516,10 @@ export default function PatientDetail() {
                     </span>
                   </div>
                 </div>
+
+                <p className="text-xs text-teal-700 bg-teal-50 border border-teal-200 rounded-lg p-2.5">
+                  Welcome email containing Patient ID and login details has been dispatched to <strong>{createdCredentials.email}</strong>.
+                </p>
 
                 <div className="flex gap-2 pt-2">
                   <button
@@ -419,3 +545,4 @@ export default function PatientDetail() {
     </div>
   )
 }
+

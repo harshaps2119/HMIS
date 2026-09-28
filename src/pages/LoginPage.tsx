@@ -3,11 +3,10 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { signIn, signOut, getAuthErrorMessage, sendPasswordResetEmail } from '../services/authService'
 import { getUserProfile } from '../services/userService'
+import { resolvePatientLogin } from '../services/patientService'
 import { useAuth } from '../contexts/AuthContext'
 import { UserRole } from '../types'
 import {
-  Stethoscope,
-  Mail,
   Lock,
   AlertCircle,
   ShieldCheck,
@@ -15,6 +14,7 @@ import {
   ArrowLeft,
   KeyRound,
   CheckCircle2,
+  Mail,
 } from 'lucide-react'
 import LoadingSpinner from '../components/ui/LoadingSpinner'
 import { CLINIC_NAME, CLINIC_ADDRESS, CLINIC_PHONE } from '../utils/constants'
@@ -29,7 +29,7 @@ const roleDashboard: Record<UserRole, string> = {
 export default function LoginPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const { currentUser, userProfile } = useAuth()
+  const { currentUser, userProfile, isPasswordRecovery } = useAuth()
 
   const portalParam = searchParams.get('portal')
   const isDeactivated = searchParams.get('deactivated') === 'true'
@@ -58,17 +58,27 @@ export default function LoginPage() {
   }, [isDeactivated])
 
   useEffect(() => {
+    // If in password recovery, redirect to /set-password, never to a dashboard
+    if (isPasswordRecovery) {
+      navigate('/set-password', { replace: true })
+      return
+    }
     if (currentUser && userProfile && userProfile.active) {
       navigate(roleDashboard[userProfile.role] || '/login', { replace: true })
     }
-  }, [currentUser, userProfile, navigate])
+  }, [currentUser, userProfile, isPasswordRecovery, navigate])
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
     setError('')
 
-    if (!email.trim() || !email.includes('@')) {
-      setError('Enter a valid email address.')
+    const cleanInput = email.trim()
+    if (!cleanInput) {
+      setError(isStaffPortal ? 'Enter a valid staff email address.' : 'Enter your Patient ID or registered email.')
+      return
+    }
+    if (isStaffPortal && !cleanInput.includes('@')) {
+      setError('Enter a valid staff email address.')
       return
     }
     if (password.length < 6) {
@@ -78,7 +88,23 @@ export default function LoginPage() {
 
     setLoading(true)
     try {
-      const user = await signIn(email.trim(), password)
+      let loginEmail = cleanInput
+      if (!isStaffPortal && !cleanInput.includes('@')) {
+        const resolveResult = await resolvePatientLogin(cleanInput)
+        if (!resolveResult.found || !resolveResult.email) {
+          setError(resolveResult.error || `No patient account found with Patient ID: ${cleanInput}`)
+          setLoading(false)
+          return
+        }
+        if (resolveResult.active === false) {
+          setError('Your patient account has been deactivated. Please contact clinic reception.')
+          setLoading(false)
+          return
+        }
+        loginEmail = resolveResult.email
+      }
+
+      const user = await signIn(loginEmail, password)
       const profile = await getUserProfile(user.uid)
 
       if (!profile || !profile.active) {
@@ -152,14 +178,14 @@ export default function LoginPage() {
           </button>
         </div>
 
-        {/* Clinic Identity */}
+        {/* Clinic Identity & Official Logo */}
         <div className="text-center mb-6">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-teal-600 to-teal-800 text-white mb-3 shadow-md">
-            <Stethoscope className="h-7 w-7" aria-hidden="true" />
+          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-white shadow-md p-1.5 mb-3 border border-gray-100">
+            <img src="/logo.jpg" alt={CLINIC_NAME} className="w-full h-full object-contain rounded-xl" />
           </div>
           <h1 className="text-xl font-bold text-gray-900">{CLINIC_NAME}</h1>
           <p className="text-xs text-gray-500 mt-0.5">{CLINIC_ADDRESS}</p>
-          <p className="text-xs text-teal-700 font-medium">{CLINIC_PHONE}</p>
+          <p className="text-xs text-teal-700 font-medium">Contact: {CLINIC_PHONE}</p>
         </div>
 
         {/* Portal Authentication Card */}
@@ -206,7 +232,7 @@ export default function LoginPage() {
             <p className="text-xs text-gray-500 mt-1">
               {isStaffPortal
                 ? 'Authorized access for Doctors, Receptionists, and Administrators'
-                : 'Enter your registered email and password to access your health records'}
+                : 'Enter your permanent Patient ID (e.g. PDC-000124) and password to access your health records'}
             </p>
           </div>
 
@@ -220,18 +246,22 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="form-label text-xs" htmlFor="email">
-                {isStaffPortal ? 'Staff Email' : 'Email Address'}
+                {isStaffPortal ? 'Staff Email' : 'Patient ID or Registered Email'}
               </label>
               <div className="relative">
-                <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                {isStaffPortal ? (
+                  <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                ) : (
+                  <KeyRound className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                )}
                 <input
                   id="email"
-                  type="email"
+                  type={isStaffPortal ? "email" : "text"}
                   value={email}
                   onChange={event => setEmail(event.target.value)}
                   className="form-input pl-10 text-xs"
-                  placeholder={isStaffPortal ? 'doctor@dentalcare.com' : 'patient@example.com'}
-                  autoComplete="email"
+                  placeholder={isStaffPortal ? 'hemanth.kumar@prasaddentalcare.com' : 'PDC-000124 or patient@example.com'}
+                  autoComplete={isStaffPortal ? "email" : "username"}
                   required
                   autoFocus
                 />

@@ -27,12 +27,12 @@ export default function PrescriptionSheet({
       {/* CLINIC HEADER */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b-2 border-teal-600 pb-6 gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-xl bg-teal-600 text-white flex items-center justify-center font-bold shadow-sm">
-            <Stethoscope className="h-7 w-7" />
+          <div className="w-14 h-14 rounded-xl bg-white border border-gray-200 p-1 flex items-center justify-center shrink-0 shadow-xs">
+            <img src="/logo.jpg" alt={CLINIC_NAME} className="w-full h-full object-contain rounded-lg" />
           </div>
           <div>
             <h1 className="text-2xl font-black text-gray-900 tracking-tight">{CLINIC_NAME}</h1>
-            <p className="text-xs text-gray-500 font-medium">Digital Dental Healthcare & Oral Surgery</p>
+            <p className="text-xs text-teal-800 font-semibold">Dr. Hemanth Kumar · BDS, MDS – Orthodontics</p>
             <p className="text-xs text-gray-400 mt-0.5">{CLINIC_ADDRESS}</p>
           </div>
         </div>
@@ -50,8 +50,8 @@ export default function PrescriptionSheet({
           <span className="font-bold text-gray-900 text-sm">{prescription.patientName}</span>
         </div>
         <div>
-          <span className="text-gray-400 block font-medium">UHID / Mobile:</span>
-          <span className="font-bold text-gray-900 font-mono">{displayPhone}</span>
+          <span className="text-gray-400 block font-medium">Patient ID / UHID:</span>
+          <span className="font-bold text-gray-900 font-mono">{prescription.uhid || displayPhone}</span>
         </div>
         <div>
           <span className="text-gray-400 block font-medium">Age / Gender:</span>

@@ -16,6 +16,7 @@ function mapUserRow(row: Record<string, unknown>): UserProfile {
     registrationNumber: (row.registration_number as string) ?? undefined,
     active: row.active as boolean,
     createdAt: row.created_at as string,
+    patientId: (row.patient_id as string) ?? undefined,
   }
 }
 

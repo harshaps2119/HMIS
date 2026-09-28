@@ -16,17 +16,20 @@ export interface UserProfile {
   registrationNumber?: string
   active: boolean
   createdAt: string   // ISO 8601 timestamptz from Postgres
+  patientId?: string  // Unique Patient ID (e.g. PDC-000001)
 }
 
 /**
  * PATIENT IDENTITY MODEL:
  * - id: UUID primary key in patients table
- * - uhid: Business Unique Health Identifier = normalized verified mobile (+91XXXXXXXXXX)
+ * - patientId: Permanent Unique Patient ID (PDC-XXXXXX)
+ * - uhid: Business Unique Health Identifier (synonymous with patientId)
  * - phone: Normalized verified mobile number (+91XXXXXXXXXX)
  */
 export interface Patient {
   id: string          // UUID from patients table
-  uhid: string        // Business UHID = normalized verified mobile number
+  patientId?: string  // Permanent Unique Patient ID (PDC-XXXXXX)
+  uhid: string        // Synonymous with patientId
   phone: string       // Normalized verified mobile number (+91XXXXXXXXXX)
   name: string
   nameLower?: string  // Generated column in Postgres
@@ -199,6 +202,10 @@ export type AuditAction =
   | 'prescription_share_initiated'
   | 'user_login'
   | 'user_logout'
+  | 'patient_id_generated'
+  | 'patient_id_email_sent'
+  | 'patient_id_email_failed'
+  | 'patient_id_email_resent'
 
 export interface AuditLog {
   id: string

@@ -33,12 +33,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const [profileLoading, setProfileLoading] = useState(false)
-  // True when Supabase has signalled a PASSWORD_RECOVERY event.
-  // While true, AuthContext will NOT load profiles or auto-redirect.
-  // PasswordSetupPage is solely responsible for this session.
-  const [isPasswordRecovery, setIsPasswordRecovery] = useState(false)
+  // Synchronous recovery detector: checks URL hash, query, and path immediately
+  const isInitialRecovery = typeof window !== 'undefined' && (
+    window.location.hash.includes('type=recovery') ||
+    window.location.search.includes('type=recovery') ||
+    window.location.pathname === '/set-password'
+  )
+
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState(isInitialRecovery)
 
   const loadProfile = async (user: AuthUser): Promise<UserProfile | null> => {
+    // Never load profile during password recovery flow
+    if (isPasswordRecovery || (typeof window !== 'undefined' && window.location.pathname === '/set-password')) {
+      return null
+    }
     setProfileLoading(true)
     try {
       const profile = await getUserProfile(user.uid)
@@ -60,6 +68,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const refreshProfile = async (user?: AuthUser | null): Promise<UserProfile | null> => {
+    if (isPasswordRecovery || (typeof window !== 'undefined' && window.location.pathname === '/set-password')) {
+      setUserProfile(null)
+      return null
+    }
     const targetUser = user !== undefined ? user : currentUser
     if (targetUser) {
       return await loadProfile(targetUser)
@@ -76,21 +88,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let mounted = true
 
+    const checkIsRecovery = () => {
+      if (typeof window === 'undefined') return false
+      return (
+        window.location.hash.includes('type=recovery') ||
+        window.location.search.includes('type=recovery') ||
+        window.location.pathname === '/set-password'
+      )
+    }
+
     const handleUserWithEvent = async (event: string, user: AuthUser | null) => {
       if (!mounted) return
 
-      // PASSWORD_RECOVERY means Supabase has processed the reset link and
-      // created a temporary recovery session. We must NOT load a profile or
-      // auto-redirect — the PasswordSetupPage handles the entire flow.
-      if (event === 'PASSWORD_RECOVERY') {
+      const inRecovery = checkIsRecovery() || event === 'PASSWORD_RECOVERY'
+
+      // PASSWORD_RECOVERY or URL recovery token:
+      // Must NOT load user profile or trigger auto-redirects to dashboards.
+      // PasswordSetupPage is solely responsible for this session.
+      if (inRecovery && event !== 'SIGNED_OUT') {
         setIsPasswordRecovery(true)
         setCurrentUser(user)
+        setUserProfile(null)
         if (mounted) setLoading(false)
         return
       }
 
-      // After the password is updated, PasswordSetupPage calls signOut().
-      // That fires SIGNED_OUT. Clear recovery flag and treat normally.
+      // After password is reset, PasswordSetupPage calls signOut().
+      // Clear recovery state.
       if (event === 'SIGNED_OUT') {
         setIsPasswordRecovery(false)
         setCurrentUser(null)
@@ -105,10 +129,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (mounted) setLoading(false)
     }
 
-    // Initialise: restore any existing session (non-recovery).
-    // getSession() never returns a PASSWORD_RECOVERY event directly —
-    // that only comes through onAuthStateChange — so we treat the initial
-    // session as a normal SIGNED_IN or null.
     getCurrentUser().then(user => {
       if (!mounted) return
       handleUserWithEvent('INITIAL_SESSION', user)

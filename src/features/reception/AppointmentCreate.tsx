@@ -4,8 +4,7 @@ import toast from 'react-hot-toast'
 import { getDoctors } from '../../services/userService'
 import { createAppointment } from '../../services/appointmentService'
 import {
-  searchPatientsByName,
-  searchPatientsByPhone,
+  searchPatients,
   getPatientById,
 } from '../../services/patientService'
 import { getTreatments } from '../../services/treatmentService'
@@ -61,30 +60,12 @@ export default function AppointmentCreate() {
         } else {
           setDoctors([
             {
-              id: 'd0000000-0000-0000-0000-000000000001',
-              uid: 'd0000000-0000-0000-0000-000000000001',
-              name: 'Dr. Ramesh Sharma',
-              phone: '+919811100002',
-              role: 'doctor',
-              specialization: 'Dental Surgeon & Endodontist',
-              active: true,
-            } as UserProfile,
-            {
               id: 'd0000000-0000-0000-0000-000000000002',
               uid: 'd0000000-0000-0000-0000-000000000002',
-              name: 'Dr. Ananya Mehta',
-              phone: '+919811100003',
+              name: 'Dr. Hemanth Kumar',
+              phone: '+918328456378',
               role: 'doctor',
-              specialization: 'Periodontist',
-              active: true,
-            } as UserProfile,
-            {
-              id: 'd0000000-0000-0000-0000-000000000003',
-              uid: 'd0000000-0000-0000-0000-000000000003',
-              name: 'Dr. Vikram Patel',
-              phone: '+919811100004',
-              role: 'doctor',
-              specialization: 'Orthodontist',
+              specialization: 'BDS, MDS – Orthodontics',
               active: true,
             } as UserProfile,
           ])
@@ -93,12 +74,12 @@ export default function AppointmentCreate() {
       .catch(() => {
         setDoctors([
           {
-            id: 'd0000000-0000-0000-0000-000000000001',
-            uid: 'd0000000-0000-0000-0000-000000000001',
-            name: 'Dr. Ramesh Sharma',
-            phone: '+919811100002',
+            id: 'd0000000-0000-0000-0000-000000000002',
+            uid: 'd0000000-0000-0000-0000-000000000002',
+            name: 'Dr. Hemanth Kumar',
+            phone: '+918328456378',
             role: 'doctor',
-            specialization: 'Dental Surgeon & Endodontist',
+            specialization: 'BDS, MDS – Orthodontics',
             active: true,
           } as UserProfile,
         ])
@@ -115,14 +96,7 @@ export default function AppointmentCreate() {
     }
     setSearching(true)
     try {
-      const isPhone = /^\d/.test(term.replace('+', ''))
-      let results: Patient[]
-      if (isPhone) {
-        const normalized = normalizePhoneNumber(term)
-        results = await searchPatientsByPhone(normalized)
-      } else {
-        results = await searchPatientsByName(term)
-      }
+      const results = await searchPatients(term)
       setPatientResults(results)
     } catch {
       // Ignored

@@ -39,11 +39,11 @@ export default function DoctorLayout() {
         }`}
       >
         <div className="flex items-center gap-3 px-6 py-5 border-b border-gray-200">
-          <div className="w-8 h-8 rounded-lg bg-teal-600 flex items-center justify-center">
-            <Stethoscope className="h-5 w-5 text-white" />
+          <div className="w-10 h-10 rounded-xl bg-white border border-gray-200 p-1 flex items-center justify-center shrink-0 shadow-sm">
+            <img src="/logo.jpg" alt={CLINIC_NAME} className="w-full h-full object-contain rounded-lg" />
           </div>
-          <div>
-            <p className="text-sm font-bold text-gray-900">{CLINIC_NAME}</p>
+          <div className="min-w-0">
+            <p className="text-sm font-bold text-gray-900 truncate">{CLINIC_NAME}</p>
             <p className="text-xs text-gray-500">Doctor Portal</p>
           </div>
         </div>

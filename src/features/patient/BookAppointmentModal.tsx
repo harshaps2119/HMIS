@@ -56,12 +56,12 @@ export default function BookAppointmentModal({
         } else {
           // Fallback primary doctor if database doctors not yet loaded
           const defaultDoc: UserProfile = {
-            id: 'd0000000-0000-0000-0000-000000000001',
-            uid: 'd0000000-0000-0000-0000-000000000001',
-            name: 'Dr. Ramesh Sharma',
-            phone: '+919811100001',
+            id: 'd0000000-0000-0000-0000-000000000002',
+            uid: 'd0000000-0000-0000-0000-000000000002',
+            name: 'Dr. Hemanth Kumar',
+            phone: '+918328456378',
             role: 'doctor',
-            specialization: 'Endodontist & Dental Surgeon',
+            specialization: 'BDS, MDS – Orthodontics',
             active: true,
             createdAt: new Date().toISOString(),
           }

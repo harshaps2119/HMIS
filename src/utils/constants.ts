@@ -71,7 +71,14 @@ export const TOOTH_FINDINGS = [
   'Normal',
 ]
 
-export const CLINIC_NAME = import.meta.env.VITE_CLINIC_NAME || 'DentalCare Clinic'
-export const CLINIC_ADDRESS = import.meta.env.VITE_CLINIC_ADDRESS || '123 Main Street, City - 500001'
-export const CLINIC_PHONE = import.meta.env.VITE_CLINIC_PHONE || '+91 99999 99999'
-export const CLINIC_EMAIL = import.meta.env.VITE_CLINIC_EMAIL || 'info@dentalcareclinic.com'
+export const CLINIC_NAME = import.meta.env.VITE_CLINIC_NAME || 'Prasad Dental Care'
+export const CLINIC_ADDRESS = import.meta.env.VITE_CLINIC_ADDRESS || 'N V R Buildings, Kothapeta, Kurnool, Andhra Pradesh – 518004'
+export const CLINIC_PHONE = import.meta.env.VITE_CLINIC_PHONE || '8328456378'
+export const CLINIC_EMAIL = import.meta.env.VITE_CLINIC_EMAIL || 'hemanth.kumar@prasaddentalcare.com'
+
+export const DEFAULT_DOCTOR_NAME = 'Dr. Hemanth Kumar'
+export const DEFAULT_DOCTOR_QUALIFICATIONS = 'BDS, MDS – Orthodontics'
+export const DEFAULT_DOCTOR_SPECIALIZATION = 'Orthodontics'
+export const DEFAULT_DOCTOR_PHONE = '8328456378'
+export const DEFAULT_DOCTOR_EMAIL = 'hemanth.kumar@prasaddentalcare.com'
+export const PATIENT_ID_PREFIX = 'PDC'

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { createPatient, provisionPatientAccount } from '../../services/patientService'
-import { sendPasswordSetupEmail } from '../../services/authService'
+import { sendPatientIdEmail } from '../../services/emailService'
 import { logAction } from '../../services/auditService'
 import { useAuth } from '../../contexts/AuthContext'
 import { getFirebaseErrorMessage } from '../../utils/errorUtils'
@@ -73,9 +73,11 @@ export default function PatientRegistration() {
     isOpen: boolean
     patientId: string
     name: string
-    uhid: string
+    phone: string
     email: string
-    password: string
+    password?: string
+    emailSent: boolean
+    emailError?: string
   } | null>(null)
   const [sendCredentialsState, setSendCredentialsState] = useState<'idle' | 'sending' | 'sent' | 'failed'>('idle')
   const [sendCredentialsError, setSendCredentialsError] = useState('')
@@ -120,6 +122,8 @@ export default function PatientRegistration() {
 
     setLoading(true)
     try {
+      let generatedPatientId = ''
+
       if (provisionPortal) {
         // Provision portal login and clinic record simultaneously via secure RPC
         const result = await provisionPatientAccount({
@@ -137,6 +141,8 @@ export default function PatientRegistration() {
           emergencyContactName: form.emergencyContactName || undefined,
         })
 
+        generatedPatientId = result.patientId
+
         if (currentUser && userProfile) {
           await logAction({
             userId: currentUser.uid,
@@ -145,57 +151,87 @@ export default function PatientRegistration() {
             action: 'patient_registered',
             targetId: result.patientId,
             targetType: 'patient',
-            description: `Registered patient & provisioned portal login: ${form.name} (UHID: ${maskPhoneNumber(verifiedPhone)})`,
+            description: `Registered patient & provisioned portal login: ${form.name} (Patient ID: ${result.patientId})`,
           })
         }
+      } else {
+        // Offline-only demographic record without portal access
+        const result = await createPatient(
+          {
+            uhid: verifiedPhone,
+            phone: verifiedPhone,
+            name: form.name.trim(),
+            dateOfBirth: form.dateOfBirth,
+            age: form.age ? parseInt(form.age) : undefined,
+            gender: form.gender as 'Male' | 'Female' | 'Other',
+            address: form.address,
+            email: form.email,
+            allergies: form.allergies,
+            medicalHistory: form.medicalHistory,
+            emergencyContact: form.emergencyContact,
+            emergencyContactName: form.emergencyContactName,
+            createdBy: currentUser?.uid || userProfile?.uid || '',
+          },
+          currentUser?.uid || ''
+        )
 
-        // Show credentials modal so staff can provide credentials to patient
-        setCredentialsModal({
-          isOpen: true,
-          patientId: result.patientId,
-          name: form.name.trim(),
-          uhid: verifiedPhone,
-          email: form.email.trim(),
-          password: portalPassword,
-        })
-        toast.success(`Patient ${form.name} registered & portal access provisioned!`)
-        return
+        generatedPatientId = result.patientId
+
+        if (currentUser && userProfile) {
+          await logAction({
+            userId: currentUser.uid,
+            userRole: userProfile.role,
+            userName: userProfile.name,
+            action: 'patient_registered',
+            targetId: result.patientId,
+            targetType: 'patient',
+            description: `Registered clinic patient: ${form.name} (Patient ID: ${result.patientId})`,
+          })
+        }
       }
 
-      // Offline-only / demographic record without portal access
-      const patientRecordId = await createPatient(
-        {
-          uhid: verifiedPhone,
-          phone: verifiedPhone,
-          name: form.name.trim(),
-          dateOfBirth: form.dateOfBirth,
-          age: form.age ? parseInt(form.age) : undefined,
-          gender: form.gender as 'Male' | 'Female' | 'Other',
-          address: form.address,
-          email: form.email,
-          allergies: form.allergies,
-          medicalHistory: form.medicalHistory,
-          emergencyContact: form.emergencyContact,
-          emergencyContactName: form.emergencyContactName,
-          createdBy: currentUser?.uid || userProfile?.uid || '',
-        },
-        currentUser?.uid || ''
-      )
+      // Automatically send Patient ID welcome email if email is provided
+      let emailSuccess = false
+      let emailErrMsg = ''
 
-      if (currentUser && userProfile) {
-        await logAction({
-          userId: currentUser.uid,
-          userRole: userProfile.role,
-          userName: userProfile.name,
-          action: 'patient_registered',
-          targetId: patientRecordId,
-          targetType: 'patient',
-          description: `Registered clinic patient: ${form.name} (UHID: ${maskPhoneNumber(verifiedPhone)})`,
-        })
+      if (form.email.trim()) {
+        try {
+          const emailRes = await sendPatientIdEmail({
+            patientName: form.name.trim(),
+            email: form.email.trim(),
+            patientId: generatedPatientId,
+            performedBy: currentUser && userProfile ? {
+              userId: currentUser.uid,
+              userRole: userProfile.role,
+              userName: userProfile.name,
+            } : undefined,
+          })
+          emailSuccess = emailRes.success
+          if (!emailRes.success) {
+            emailErrMsg = emailRes.error || 'Email service could not deliver message.'
+          }
+        } catch (e: unknown) {
+          emailErrMsg = e instanceof Error ? e.message : 'Failed to send email.'
+        }
       }
 
-      toast.success(`Patient ${form.name} registered successfully!`)
-      navigate(`/reception/patients/${patientRecordId}`)
+      if (form.email.trim() && !emailSuccess) {
+        toast('Patient registered successfully, but the Patient ID email could not be sent.', { icon: '⚠️' })
+      } else {
+        toast.success(`Patient ${form.name} registered successfully!`)
+      }
+
+      // Show success confirmation modal
+      setCredentialsModal({
+        isOpen: true,
+        patientId: generatedPatientId,
+        name: form.name.trim(),
+        phone: verifiedPhone,
+        email: form.email.trim(),
+        password: provisionPortal ? portalPassword : '',
+        emailSent: emailSuccess,
+        emailError: emailErrMsg,
+      })
     } catch (err: unknown) {
       console.error('Registration failed:', err)
       setError(getFirebaseErrorMessage(err))
@@ -207,30 +243,52 @@ export default function PatientRegistration() {
   const updateForm = (field: keyof FormData, value: string) =>
     setForm(prev => ({ ...prev, [field]: value }))
 
-  const handleCopyCredentials = () => {
+  const handleCopyPatientId = () => {
     if (!credentialsModal) return
-    const text = `DentalCare Patient Portal Credentials:\nPatient Name: ${credentialsModal.name}\nUHID / Mobile: ${credentialsModal.uhid}\nLogin Email: ${credentialsModal.email}\nInitial Password: ${credentialsModal.password}\nPortal Link: ${window.location.origin}/login?portal=patient`
-    navigator.clipboard.writeText(text)
-    toast.success('Credentials copied to clipboard!')
+    navigator.clipboard.writeText(credentialsModal.patientId)
+    toast.success(`Patient ID ${credentialsModal.patientId} copied!`)
   }
 
-  const handleSendCredentials = async () => {
-    if (!credentialsModal || sendCredentialsState === 'sending') return
+  const handleCopyCredentials = () => {
+    if (!credentialsModal) return
+    const text = `Prasad Dental Care Patient Details:\nPatient Name: ${credentialsModal.name}\nPatient ID: ${credentialsModal.patientId}\nMobile: ${credentialsModal.phone}\nLogin Email: ${credentialsModal.email || 'None'}\n${credentialsModal.password ? `Initial Password: ${credentialsModal.password}\n` : ''}Portal Link: ${window.location.origin}/login?portal=patient`
+    navigator.clipboard.writeText(text)
+    toast.success('Patient details copied to clipboard!')
+  }
+
+  const handleResendEmail = async () => {
+    if (!credentialsModal || sendCredentialsState === 'sending' || !credentialsModal.email) return
 
     setSendCredentialsState('sending')
     setSendCredentialsError('')
     try {
-      await sendPasswordSetupEmail(
-        credentialsModal.email,
-        `${window.location.origin}/set-password?portal=patient`
+      const emailRes = await sendPatientIdEmail(
+        {
+          patientName: credentialsModal.name,
+          email: credentialsModal.email,
+          patientId: credentialsModal.patientId,
+          performedBy: currentUser && userProfile ? {
+            userId: currentUser.uid,
+            userRole: userProfile.role,
+            userName: userProfile.name,
+          } : undefined,
+        },
+        true
       )
-      setSendCredentialsState('sent')
-      toast.success(`Password setup instructions sent to ${credentialsModal.email}.`)
+
+      if (emailRes.success) {
+        setSendCredentialsState('sent')
+        toast.success(`Patient ID welcome email sent to ${credentialsModal.email}!`)
+      } else {
+        setSendCredentialsState('failed')
+        setSendCredentialsError(emailRes.error || 'Unable to deliver email.')
+        toast.error('Could not send Patient ID email.')
+      }
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Unable to send the password setup email.'
+      const message = err instanceof Error ? err.message : 'Unable to send email.'
       setSendCredentialsState('failed')
       setSendCredentialsError(message)
-      toast.error('Could not send patient credentials.')
+      toast.error('Could not send Patient ID email.')
     }
   }
 
@@ -243,7 +301,7 @@ export default function PatientRegistration() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Register New Patient</h1>
           <p className="text-sm text-gray-500">
-            Enter the patient mobile number (UHID), fill clinical demographics, and provision Patient Portal access
+            Enter patient details to automatically generate a unique permanent Patient ID and provision Patient Portal access
           </p>
         </div>
       </div>
@@ -291,7 +349,7 @@ export default function PatientRegistration() {
           <form onSubmit={handleContinue} className="space-y-4">
             <h2 className="font-semibold text-gray-900">Patient Mobile Number</h2>
             <div>
-              <label className="form-label">Patient Mobile Number (UHID)</label>
+              <label className="form-label">Patient Mobile Number</label>
               <div className="flex">
                 <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-gray-300 bg-gray-50 text-gray-600 text-sm">
                   +91
@@ -308,7 +366,7 @@ export default function PatientRegistration() {
                 />
               </div>
               <p className="text-xs text-gray-500 mt-1">
-                This mobile number becomes the patient's permanent UHID.
+                A unique permanent Patient ID (e.g. PDC-000001) will be generated automatically upon registration.
               </p>
             </div>
             <button
@@ -332,9 +390,9 @@ export default function PatientRegistration() {
             <div className="p-3 rounded-lg bg-green-50 border border-green-200 flex items-center gap-2">
               <CheckCircle className="h-5 w-5 text-green-500" />
               <div>
-                <p className="text-sm font-semibold text-green-700">Mobile Number Added</p>
-                <p className="text-xs text-green-600 font-mono">
-                  Permanent UHID: {verifiedPhone}
+                <p className="text-sm font-semibold text-green-700">Mobile Number Added: +91 {verifiedPhone}</p>
+                <p className="text-xs text-green-600">
+                  Unique Patient ID will be generated automatically by the backend system.
                 </p>
               </div>
             </div>
@@ -403,7 +461,7 @@ export default function PatientRegistration() {
                   />
                   {provisionPortal && (
                     <p className="text-[11px] text-teal-700 mt-1">
-                      Required for patient portal authentication
+                      Required for Patient Portal authentication and Patient ID welcome email
                     </p>
                   )}
                 </div>
@@ -476,7 +534,7 @@ export default function PatientRegistration() {
                     Provision Patient Portal Login
                   </label>
                   <p className="text-xs text-gray-600 mt-0.5">
-                    Generates secure login credentials allowing the patient to sign into the Patient Portal.
+                    Generates secure login credentials allowing the patient to sign into the Patient Portal using their Patient ID.
                   </p>
                 </div>
               </div>
@@ -508,7 +566,7 @@ export default function PatientRegistration() {
                       </button>
                     </div>
                     <p className="text-[11px] text-gray-500 mt-1">
-                      Provide this temporary password to the patient along with their email address.
+                      The patient can sign in to the Patient Portal using their Patient ID and this password.
                     </p>
                   </div>
                 </div>
@@ -541,7 +599,7 @@ export default function PatientRegistration() {
         )}
       </div>
 
-      {/* Credentials Handover Modal */}
+      {/* Clean Success Confirmation Modal */}
       {credentialsModal?.isOpen && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95">
@@ -550,9 +608,30 @@ export default function PatientRegistration() {
                 <CheckCircle className="h-6 w-6 text-teal-600" />
               </div>
               <div>
-                <h3 className="text-lg font-bold text-gray-900">Registration Complete</h3>
-                <p className="text-xs text-gray-500">Patient Portal credentials generated</p>
+                <h3 className="text-lg font-bold text-gray-900">Patient Registered Successfully</h3>
+                <p className="text-xs text-gray-500">Patient ID has been generated automatically.</p>
               </div>
+            </div>
+
+            {/* Generated Patient ID Highlight Box */}
+            <div className="p-4 rounded-xl bg-teal-50 border border-teal-200 text-center space-y-1">
+              <span className="text-xs uppercase tracking-wider text-teal-700 font-semibold">Generated Patient ID</span>
+              <div className="flex items-center justify-center gap-2">
+                <span className="text-2xl font-mono font-extrabold text-teal-900 tracking-wider">
+                  {credentialsModal.patientId}
+                </span>
+                <button
+                  type="button"
+                  onClick={handleCopyPatientId}
+                  className="p-1.5 rounded-lg bg-teal-100 hover:bg-teal-200 text-teal-800 transition-colors"
+                  title="Copy Patient ID"
+                >
+                  <Copy className="h-4 w-4" />
+                </button>
+              </div>
+              <p className="text-[11px] text-teal-700 font-medium">
+                Permanent login identifier for patient portal access
+              </p>
             </div>
 
             <div className="p-4 rounded-xl bg-gray-50 border border-gray-200 space-y-2 text-xs">
@@ -561,62 +640,78 @@ export default function PatientRegistration() {
                 <span className="font-semibold text-gray-900">{credentialsModal.name}</span>
               </div>
               <div className="flex justify-between py-1 border-b border-gray-200">
-                <span className="text-gray-500">UHID (Mobile):</span>
-                <span className="font-mono font-semibold text-gray-900">{credentialsModal.uhid}</span>
+                <span className="text-gray-500">Patient ID:</span>
+                <span className="font-mono font-bold text-gray-900">{credentialsModal.patientId}</span>
               </div>
               <div className="flex justify-between py-1 border-b border-gray-200">
-                <span className="text-gray-500">Portal Login Email:</span>
-                <span className="font-semibold text-teal-800">{credentialsModal.email}</span>
+                <span className="text-gray-500">Phone:</span>
+                <span className="font-mono font-semibold text-gray-900">{credentialsModal.phone}</span>
               </div>
-              <div className="flex justify-between py-1">
-                <span className="text-gray-500">Initial Password:</span>
-                <span className="font-mono font-bold text-gray-900 bg-white px-2 py-0.5 rounded border border-gray-300">
-                  {credentialsModal.password}
-                </span>
+              <div className="flex justify-between py-1 border-b border-gray-200">
+                <span className="text-gray-500">Email:</span>
+                <span className="font-semibold text-gray-900">{credentialsModal.email || 'None'}</span>
               </div>
+              {credentialsModal.password && (
+                <div className="flex justify-between py-1">
+                  <span className="text-gray-500">Initial Password:</span>
+                  <span className="font-mono font-bold text-gray-900 bg-white px-2 py-0.5 rounded border border-gray-300">
+                    {credentialsModal.password}
+                  </span>
+                </div>
+              )}
             </div>
 
-            <p className="text-xs text-gray-500">
-              Share the temporary password manually or send a secure password setup link. The patient can sign in at the <strong>Patient Portal</strong>.
-            </p>
-
-            {sendCredentialsState === 'sent' && (
-              <p className="text-xs text-green-700 bg-green-50 border border-green-200 rounded-lg p-2">
-                Password setup instructions were sent to {credentialsModal.email}.
-              </p>
-            )}
-            {sendCredentialsState === 'failed' && (
-              <p className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg p-2">
-                {sendCredentialsError || 'Unable to send password setup instructions.'}
-              </p>
+            {/* Email delivery status banner */}
+            {credentialsModal.email && (
+              <>
+                {credentialsModal.emailSent || sendCredentialsState === 'sent' ? (
+                  <div className="p-2.5 rounded-lg bg-green-50 border border-green-200 text-xs text-green-800 flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4 text-green-600 shrink-0" />
+                    <span>Patient ID welcome email sent to <strong>{credentialsModal.email}</strong>.</span>
+                  </div>
+                ) : (
+                  <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-800 flex items-start gap-2">
+                    <AlertCircle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-semibold">Patient registered successfully, but the Patient ID email could not be sent.</p>
+                      <p className="text-[11px] text-amber-700 mt-0.5">
+                        {credentialsModal.emailError || sendCredentialsError || 'Backend email delivery was not completed. Communicate the Patient ID directly to the patient or click Resend.'}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
 
             <div className="flex flex-col sm:flex-row gap-2 pt-2">
               <button
                 type="button"
-                onClick={handleCopyCredentials}
+                onClick={handleCopyPatientId}
                 className="btn-secondary text-xs flex-1 flex items-center justify-center gap-1.5"
               >
-                <Copy className="h-4 w-4" /> Copy Credentials
+                <Copy className="h-4 w-4" /> Copy ID
               </button>
-              <button
-                type="button"
-                onClick={handleSendCredentials}
-                disabled={sendCredentialsState === 'sending' || sendCredentialsState === 'sent'}
-                className="btn-secondary text-xs flex-1 flex items-center justify-center gap-1.5"
-              >
-                <Mail className="h-4 w-4" />
-                {sendCredentialsState === 'sending' ? 'Sending...' : sendCredentialsState === 'sent' ? 'Credentials Sent' : 'Send Credentials to Patient'}
-              </button>
+              {credentialsModal.email && (
+                <button
+                  type="button"
+                  onClick={handleResendEmail}
+                  disabled={sendCredentialsState === 'sending'}
+                  className="btn-secondary text-xs flex-1 flex items-center justify-center gap-1.5"
+                >
+                  <Mail className="h-4 w-4" />
+                  {sendCredentialsState === 'sending' ? 'Sending...' : 'Resend ID Email'}
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => {
+                  const id = credentialsModal.patientId
                   setCredentialsModal(null)
-                  navigate(`/reception/patients/${credentialsModal.patientId}`)
+                  navigate(`/reception/patients/${id}`)
                 }}
                 className="btn-primary text-xs flex-1 flex items-center justify-center gap-1.5"
               >
-                <ExternalLink className="h-4 w-4" /> View Patient Profile
+                <ExternalLink className="h-4 w-4" /> View Profile
               </button>
             </div>
           </div>
@@ -625,3 +720,4 @@ export default function PatientRegistration() {
     </div>
   )
 }
+

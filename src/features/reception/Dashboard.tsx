@@ -12,6 +12,7 @@ import {
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import StatusBadge from '../../components/ui/StatusBadge'
 import { format } from 'date-fns'
+import { CLINIC_NAME, DEFAULT_DOCTOR_NAME, DEFAULT_DOCTOR_QUALIFICATIONS } from '../../utils/constants'
 
 export default function ReceptionDashboard() {
   const { userProfile } = useAuth()
@@ -59,14 +60,30 @@ export default function ReceptionDashboard() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">
-          Good {new Date().getHours() < 12 ? 'Morning' : new Date().getHours() < 17 ? 'Afternoon' : 'Evening'},
-          {' '}{userProfile?.name?.split(' ')[0] || 'Receptionist'} 👋
-        </h1>
-        <p className="text-sm text-gray-500 mt-1">
-          {format(new Date(), 'EEEE, dd MMMM yyyy')}
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-gray-200/80 shadow-xs">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-xl bg-white border border-gray-200 p-1 flex items-center justify-center shrink-0 shadow-xs">
+            <img src="/logo.jpg" alt={CLINIC_NAME} className="w-full h-full object-contain rounded-lg" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-teal-700 bg-teal-50 px-2 py-0.5 rounded-full border border-teal-100">
+                {CLINIC_NAME}
+              </span>
+              <span className="text-xs text-gray-400">·</span>
+              <span className="text-xs text-gray-500 font-medium">
+                {DEFAULT_DOCTOR_NAME} ({DEFAULT_DOCTOR_QUALIFICATIONS})
+              </span>
+            </div>
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">
+              Good {new Date().getHours() < 12 ? 'Morning' : new Date().getHours() < 17 ? 'Afternoon' : 'Evening'},
+              {' '}{userProfile?.name?.split(' ')[0] || 'Receptionist'} 👋
+            </h1>
+            <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
+              {format(new Date(), 'EEEE, dd MMMM yyyy')}
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* Stats */}

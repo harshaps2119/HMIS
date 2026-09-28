@@ -17,9 +17,14 @@ const roleDashboard: Record<UserRole, string> = {
 }
 
 export default function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
-  const { currentUser, userProfile, loading, profileLoading } = useAuth()
+  const { currentUser, userProfile, loading, profileLoading, isPasswordRecovery } = useAuth()
 
-  // Wait if auth is initializing OR if user is authenticated but profile is still loading from Firestore
+  // If in password recovery, never allow access to protected dashboards — redirect to /set-password
+  if (isPasswordRecovery) {
+    return <Navigate to="/set-password" replace />
+  }
+
+  // Wait if auth is initializing OR if user is authenticated but profile is still loading from database
   if (loading || (currentUser && profileLoading)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">

@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
-import { getPatient } from '../../services/patientService'
+import { getPatient, getPatientByUserId } from '../../services/patientService'
 import { getPatientAppointments } from '../../services/appointmentService'
 import { getPatientConsultations } from '../../services/consultationService'
 import { getPatientPrescriptions } from '../../services/prescriptionService'
@@ -9,7 +9,7 @@ import { Patient, Appointment, Consultation, Prescription } from '../../types'
 import { formatDate, formatTime, isAppointmentFuture } from '../../utils/dateUtils'
 import {
   Calendar, FileText, Clock, AlertCircle, ArrowRight,
-  Stethoscope, Pill, CheckCircle, Phone, Plus
+  Stethoscope, Pill, CheckCircle, Phone, Plus, Hash, Copy
 } from 'lucide-react'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import StatusBadge from '../../components/ui/StatusBadge'
@@ -74,23 +74,38 @@ export default function PatientDashboard() {
       setLoadError('Your clinic profile could not be loaded. Please sign in again or contact the clinic administrator.')
       return
     }
-    if (!userProfile?.phone) {
-      setLoading(false)
-      return
-    }
+
+    const lookupTarget = userProfile.patientId || userProfile.phone
+
     setLoading(true)
     try {
-      const [p, appts, consults, rxs] = await Promise.all([
-        getPatient(userProfile.phone),
-        getPatientAppointments(userProfile.phone),
-        getPatientConsultations(userProfile.phone),
-        getPatientPrescriptions(userProfile.phone),
-      ])
-      if (!p) {
-        setLoadError('No patient record was found for your registered mobile number. Please contact the clinic receptionist.')
+      let p: Patient | null = null
+
+      if (lookupTarget) {
+        p = await getPatient(lookupTarget)
+      }
+
+      if (!p && currentUser.uid) {
+        p = await getPatientByUserId(currentUser.uid)
+      }
+
+      if (!p && !lookupTarget) {
+        setLoading(false)
         return
       }
+
+      if (!p) {
+        setLoadError('No patient record was found for your account. Please contact the clinic receptionist.')
+        return
+      }
+
       setPatient(p)
+
+      const [appts, consults, rxs] = await Promise.all([
+        getPatientAppointments(p.id),
+        getPatientConsultations(p.id),
+        getPatientPrescriptions(p.id),
+      ])
       setAppointments(appts || [])
       setConsultations(consults || [])
       setPrescriptions(rxs || [])
@@ -128,6 +143,7 @@ export default function PatientDashboard() {
   const requestedAppts = appointments.filter(a => a.status === 'requested')
   const latestConsult = consultations[0]
   const latestRx = prescriptions[0]
+  const displayPatientId = patient?.patientId || patient?.uhid || userProfile?.patientId
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto pb-12">
@@ -137,9 +153,26 @@ export default function PatientDashboard() {
           <div>
             <span className="text-xs uppercase tracking-widest text-teal-200 font-semibold">Patient Portal</span>
             <h1 className="text-2xl sm:text-3xl font-bold mt-1">Hello, {patient?.name || userProfile?.name} 👋</h1>
-            <div className="flex items-center gap-3 mt-2 text-teal-100 text-xs sm:text-sm">
+            <div className="flex flex-wrap items-center gap-2.5 mt-3 text-teal-100 text-xs sm:text-sm">
+              {displayPatientId && (
+                <span className="inline-flex items-center gap-1.5 bg-teal-950/80 border border-teal-400/40 px-3 py-1 rounded-lg font-mono font-bold text-teal-100 shadow-sm">
+                  <Hash className="h-3.5 w-3.5 text-teal-300" />
+                  Patient ID: {displayPatientId}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(displayPatientId)
+                      toast.success(`Patient ID ${displayPatientId} copied!`)
+                    }}
+                    className="ml-1 p-0.5 hover:text-white transition-colors"
+                    title="Copy Patient ID"
+                  >
+                    <Copy className="h-3 w-3" />
+                  </button>
+                </span>
+              )}
               <span className="bg-teal-800/80 px-2.5 py-1 rounded-md font-mono">
-                Mobile: {userProfile?.phone ? maskPhone(userProfile.phone) : '—'}
+                Mobile: {userProfile?.phone ? maskPhone(userProfile.phone) : (patient?.phone ? maskPhone(patient.phone) : '—')}
               </span>
               {patient?.gender && <span>{patient.gender}</span>}
               {patient?.age && <span>· {patient.age} yrs</span>}
