@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { Lock, Save, AlertCircle } from 'lucide-react'
 import LoadingSpinner from '../components/ui/LoadingSpinner'
@@ -11,40 +11,46 @@ import { CLINIC_NAME } from '../utils/constants'
  * PasswordSetupPage — handles the Supabase Auth recovery flow.
  *
  * Recovery flow summary:
- *  1. Receptionist calls sendPasswordSetupEmail(email, redirectTo='/set-password')
- *  2. Patient receives email, clicks link.
+ *  1. Staff/Admin calls sendPasswordSetupEmail(email, redirectTo='/set-password?portal=...')
+ *  2. User receives email, clicks link.
  *  3. Supabase verifies the token and redirects to:
  *       /set-password#access_token=...&refresh_token=...&type=recovery
  *  4. The Supabase JS client detects the hash on page load and fires
  *     onAuthStateChange with event='PASSWORD_RECOVERY'.
  *  5. This component listens for that event before allowing the form.
- *  6. Patient enters a new password → updateUser() is called.
- *  7. Recovery session is signed out, patient is redirected to login.
+ *  6. User enters a new password → updateUser() is called.
+ *  7. Recovery session is signed out, user is redirected to appropriate login portal.
  *
  * IMPORTANT: Do NOT allow updateUser() before the PASSWORD_RECOVERY event
  * is received. Calling it without a valid recovery session will fail.
  */
 export default function PasswordSetupPage() {
   const navigate = useNavigate()
-  const { isPasswordRecovery } = useAuth()
+  const [searchParams] = useSearchParams()
+  const isStaffPortal = searchParams.get('portal') === 'staff'
+
+  const { isPasswordRecovery, currentUser } = useAuth()
   const [password, setPassword] = useState('')
   const [confirmation, setConfirmation] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+
+  const hasRecoveryInUrl = typeof window !== 'undefined' && (
+    window.location.hash.includes('type=recovery') ||
+    window.location.search.includes('type=recovery')
+  )
 
   // Three states for the recovery session:
   //  'waiting'   — on page load, waiting for Supabase to fire PASSWORD_RECOVERY
   //  'ready'     — recovery session confirmed, show password form
   //  'invalid'   — page was opened without a valid recovery link
   const [sessionState, setSessionState] = useState<'waiting' | 'ready' | 'invalid'>(
-    // If AuthContext already detected PASSWORD_RECOVERY (event fired before
-    // this component mounted), start in 'ready' immediately.
-    isPasswordRecovery ? 'ready' : 'waiting'
+    isPasswordRecovery || (Boolean(currentUser) && hasRecoveryInUrl) ? 'ready' : 'waiting'
   )
 
   useEffect(() => {
-    // If AuthContext already flagged recovery, we are ready — no need to wait.
-    if (isPasswordRecovery && sessionState === 'waiting') {
+    // If AuthContext already flagged recovery or session is established, we are ready
+    if (isPasswordRecovery || (currentUser && hasRecoveryInUrl)) {
       setSessionState('ready')
       return
     }
@@ -52,10 +58,8 @@ export default function PasswordSetupPage() {
     // Give Supabase JS client a moment to process the URL hash tokens.
     // The client fires onAuthStateChange with event='PASSWORD_RECOVERY' once
     // the token is validated. We wait for that before showing the form.
-    //
-    // IMPORTANT: use the 2-argument form — callback receives (event, user).
-    const unsubscribe = subscribeToAuthStateWithEvent((event, _user) => {
-      if (event === 'PASSWORD_RECOVERY') {
+    const unsubscribe = subscribeToAuthStateWithEvent((event, user) => {
+      if (event === 'PASSWORD_RECOVERY' || (event === 'SIGNED_IN' && hasRecoveryInUrl && user)) {
         setSessionState('ready')
       }
     })
@@ -74,7 +78,7 @@ export default function PasswordSetupPage() {
       unsubscribe()
       clearTimeout(timeout)
     }
-  }, [isPasswordRecovery])
+  }, [isPasswordRecovery, currentUser, hasRecoveryInUrl])
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -97,12 +101,14 @@ export default function PasswordSetupPage() {
     setLoading(true)
     try {
       await updatePassword(password)
-      // Sign out the recovery session so the patient starts fresh at login.
+      // Sign out the recovery session so the user starts fresh at login.
       // This prevents the recovery session from being reused and ensures a
       // clean login state.
       await signOut()
-      toast.success('Password updated. You can now sign in to the Patient Portal.')
-      navigate('/login?portal=patient', { replace: true })
+      const portalTarget = isStaffPortal ? '/login?portal=staff' : '/login?portal=patient'
+      const portalName = isStaffPortal ? 'Staff Portal' : 'Patient Portal'
+      toast.success(`Password updated. You can now sign in to the ${portalName}.`)
+      navigate(portalTarget, { replace: true })
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Unable to update your password.')
     } finally {
@@ -142,14 +148,14 @@ export default function PasswordSetupPage() {
           <p className="text-xs text-gray-500 mb-4">{CLINIC_NAME}</p>
           <p className="text-sm text-gray-600 mb-6">
             This password-reset link is invalid or has already been used. Please ask
-            clinic reception to resend your credentials email.
+            clinic {isStaffPortal ? 'administration' : 'reception'} to resend your credentials email.
           </p>
           <button
             type="button"
-            onClick={() => navigate('/login?portal=patient')}
+            onClick={() => navigate(isStaffPortal ? '/login?portal=staff' : '/login?portal=patient')}
             className="btn-primary w-full"
           >
-            Go to Patient Login
+            Go to {isStaffPortal ? 'Staff Login' : 'Patient Login'}
           </button>
         </div>
       </div>
@@ -164,7 +170,9 @@ export default function PasswordSetupPage() {
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-teal-700 text-white mb-3 shadow-md">
             <Lock className="h-7 w-7" />
           </div>
-          <h1 className="text-xl font-bold text-gray-900">Set Patient Portal Password</h1>
+          <h1 className="text-xl font-bold text-gray-900">
+            {isStaffPortal ? 'Set Staff Account Password' : 'Set Patient Portal Password'}
+          </h1>
           <p className="text-xs text-gray-500 mt-1">{CLINIC_NAME}</p>
         </div>
 

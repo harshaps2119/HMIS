@@ -1,9 +1,38 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
-import { AuthProvider } from './contexts/AuthContext'
+import { useEffect } from 'react'
+import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { AuthProvider, useAuth } from './contexts/AuthContext'
 import ProtectedRoute from './components/routing/ProtectedRoute'
 import LoginPage from './pages/LoginPage'
 import LandingPage from './pages/LandingPage'
 import PasswordSetupPage from './pages/PasswordSetupPage'
+
+// Synchronous intercept: if Supabase redirected to root / with recovery tokens,
+// immediately route to /set-password before any dashboard can mount.
+if (typeof window !== 'undefined' && window.location.pathname !== '/set-password') {
+  const hash = window.location.hash || ''
+  const search = window.location.search || ''
+  if (hash.includes('type=recovery') || search.includes('type=recovery')) {
+    window.location.replace('/set-password' + search + hash)
+  }
+}
+
+function RecoveryRouteInterceptor() {
+  const { isPasswordRecovery } = useAuth()
+  const location = useLocation()
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    const hash = window.location.hash || ''
+    const search = window.location.search || ''
+    const hasRecoveryTokens = hash.includes('type=recovery') || search.includes('type=recovery')
+
+    if ((isPasswordRecovery || hasRecoveryTokens) && location.pathname !== '/set-password') {
+      navigate('/set-password' + search + hash, { replace: true })
+    }
+  }, [isPasswordRecovery, location.pathname, navigate])
+
+  return null
+}
 
 // Reception
 import ReceptionLayout from './layouts/ReceptionLayout'
@@ -15,6 +44,8 @@ import AppointmentCreate from './features/reception/AppointmentCreate'
 import AppointmentQueue from './features/reception/AppointmentQueue'
 import TreatmentPriceReference from './features/reception/TreatmentPriceReference'
 import MedicationReference from './features/reception/MedicationReference'
+import TestPatientManager from './features/reception/TestPatientManager'
+import StaffManagement from './features/admin/StaffManagement'
 
 // Doctor
 import DoctorLayout from './layouts/DoctorLayout'
@@ -38,6 +69,7 @@ import ClinicFeedback from './features/feedback/ClinicFeedback'
 export default function App() {
   return (
     <AuthProvider>
+      <RecoveryRouteInterceptor />
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
@@ -58,6 +90,22 @@ export default function App() {
           <Route path="appointments/new" element={<AppointmentCreate />} />
           <Route path="treatments" element={<TreatmentPriceReference />} />
           <Route path="medications" element={<MedicationReference />} />
+          <Route path="staff" element={<Navigate to="/admin/staff" replace />} />
+          <Route path="test-patients" element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <TestPatientManager />
+            </ProtectedRoute>
+          } />
+        </Route>
+
+        {/* Admin Routes */}
+        <Route path="/admin" element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <ReceptionLayout />
+          </ProtectedRoute>
+        }>
+          <Route index element={<Navigate to="/admin/staff" replace />} />
+          <Route path="staff" element={<StaffManagement />} />
         </Route>
 
         {/* Doctor Routes */}

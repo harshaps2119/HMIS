@@ -5,7 +5,7 @@ import { signOut } from '../services/authService'
 import toast from 'react-hot-toast'
 import {
   LayoutDashboard, Users, Calendar, Tag, Pill,
-  LogOut, Menu, X, Stethoscope, ChevronDown,
+  LogOut, Menu, X, Stethoscope, ChevronDown, UserCog, Trash2,
 } from 'lucide-react'
 import { CLINIC_NAME } from '../utils/constants'
 
@@ -15,6 +15,11 @@ const navLinks = [
   { to: '/reception/appointments', icon: Calendar, label: 'Appointments' },
   { to: '/reception/treatments', icon: Tag, label: 'Price Reference' },
   { to: '/reception/medications', icon: Pill, label: 'Medications' },
+]
+
+const adminLinks = [
+  { to: '/admin/staff', icon: UserCog, label: 'Staff Accounts' },
+  { to: '/reception/test-patients', icon: Trash2, label: 'Test Patients' },
 ]
 
 export default function ReceptionLayout() {
@@ -31,6 +36,8 @@ export default function ReceptionLayout() {
       toast.error('Failed to sign out')
     }
   }
+
+  const isAdmin = userProfile?.role === 'admin'
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -54,7 +61,7 @@ export default function ReceptionLayout() {
           </div>
           <div>
             <p className="text-sm font-bold text-gray-900">{CLINIC_NAME}</p>
-            <p className="text-xs text-gray-500">Reception</p>
+            <p className="text-xs text-gray-500">{isAdmin ? 'Clinic Administration' : 'Reception'}</p>
           </div>
         </div>
 
@@ -74,6 +81,31 @@ export default function ReceptionLayout() {
               {label}
             </NavLink>
           ))}
+
+          {isAdmin && (
+            <>
+              <div className="pt-4 pb-1">
+                <p className="px-3 text-[11px] font-bold uppercase tracking-wider text-purple-700">
+                  Admin Tools
+                </p>
+              </div>
+              {adminLinks.map(({ to, icon: Icon, label }) => (
+                <NavLink
+                  key={to}
+                  to={to}
+                  className={({ isActive }) =>
+                    `sidebar-link ${
+                      isActive ? 'sidebar-link-active' : 'sidebar-link-inactive'
+                    }`
+                  }
+                  onClick={() => setSidebarOpen(false)}
+                >
+                  <Icon className="h-5 w-5 shrink-0 text-purple-600" />
+                  {label}
+                </NavLink>
+              ))}
+            </>
+          )}
         </nav>
 
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200">
