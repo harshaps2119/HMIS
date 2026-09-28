@@ -11,7 +11,8 @@ export default async function handler(req: any, res: any) {
   }
 
   const resendApiKey = process.env.RESEND_API_KEY
-  const senderEmail = process.env.SENDER_EMAIL || 'Prasad Dental Care <care@prasaddentalcare.com>'
+  // Resend free tier allows onboarding@resend.dev without requiring custom domain DNS verification
+  const senderEmail = process.env.SENDER_EMAIL || 'Prasad Dental Care <onboarding@resend.dev>'
 
   // Resend HTTP API (No external npm package required)
   if (resendApiKey) {

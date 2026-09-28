@@ -12,7 +12,7 @@ import { Patient, Appointment, UserProfile } from '../../types'
 import { formatDate, formatTime } from '../../utils/dateUtils'
 import {
   Phone, Mail, MapPin, AlertTriangle, Calendar,
-  ArrowLeft, Plus, ShieldCheck, Key, Copy, RefreshCw, CheckCircle, Hash, Trash2,
+  ArrowLeft, Plus, ShieldCheck, Key, Copy, RefreshCw, CheckCircle, Hash, Trash2, Share2,
 } from 'lucide-react'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import ErrorState from '../../components/ui/ErrorState'
@@ -91,6 +91,24 @@ export default function PatientDetail() {
     toast.success(`Patient ID ${idToCopy} copied to clipboard!`)
   }
 
+  const handleCopyShareDetails = () => {
+    if (!patient) return
+    const displayId = patient.patientId || patient.uhid
+    const portalUrl = `${window.location.origin}/login?portal=patient`
+    const text = `Welcome to Prasad Dental Care!\n\nDear ${patient.name},\nYour patient account has been created.\n\n• Patient ID: ${displayId}\n• Mobile: ${patient.phone}\n${patient.email ? `• Login Email: ${patient.email}\n` : ''}• Patient Portal: ${portalUrl}\n\nPlease keep your Patient ID safe to view your appointments, prescriptions, and dental history.`
+    navigator.clipboard.writeText(text)
+    toast.success('Patient login info copied to clipboard!')
+  }
+
+  const handleShareWhatsApp = () => {
+    if (!patient) return
+    const displayId = patient.patientId || patient.uhid
+    const portalUrl = `${window.location.origin}/login?portal=patient`
+    const phoneDigits = patient.phone.replace(/\D/g, '')
+    const text = `Welcome to Prasad Dental Care!\n\nDear ${patient.name},\nYour patient account is active.\n\n• Patient ID: ${displayId}\n• Mobile: ${patient.phone}\n• Portal Link: ${portalUrl}\n\nPlease use your Patient ID to log in and view your prescriptions and upcoming visits.`
+    window.open(`https://wa.me/${phoneDigits}?text=${encodeURIComponent(text)}`, '_blank')
+  }
+
   const handleResendPatientIdEmail = async () => {
     if (!patient) return
     if (!patient.email) {
@@ -118,11 +136,13 @@ export default function PatientDetail() {
       if (res.success) {
         toast.success(`Patient ID welcome email sent to ${patient.email}!`)
       } else {
-        toast.error(`Email delivery could not be completed: ${res.error || 'Check server configuration'}`)
+        toast.error(`Email delivery note: ${res.error || 'Check server configuration'}`)
+        handleCopyShareDetails()
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to send email'
       toast.error(msg)
+      handleCopyShareDetails()
     } finally {
       setSendingEmail(false)
     }
@@ -361,6 +381,26 @@ export default function PatientDetail() {
                 </button>
               </div>
             )}
+
+            {/* Direct Share Options */}
+            <div className="pt-1 flex gap-2">
+              <button
+                type="button"
+                onClick={handleShareWhatsApp}
+                className="flex-1 btn-secondary text-xs py-1.5 flex items-center justify-center gap-1.5 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border-emerald-200"
+                title="Send login link to patient via WhatsApp"
+              >
+                <Share2 className="h-3.5 w-3.5 text-emerald-600" /> WhatsApp
+              </button>
+              <button
+                type="button"
+                onClick={handleCopyShareDetails}
+                className="flex-1 btn-secondary text-xs py-1.5 flex items-center justify-center gap-1.5 text-gray-700 hover:bg-gray-100 border-gray-200"
+                title="Copy portal login link and patient info to clipboard"
+              >
+                <Copy className="h-3.5 w-3.5" /> Copy Details
+              </button>
+            </div>
             {patient.address && (
               <div className="flex items-start gap-2 text-gray-600">
                 <MapPin className="h-4 w-4 text-gray-400 shrink-0 mt-0.5" />

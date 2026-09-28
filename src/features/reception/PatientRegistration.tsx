@@ -19,6 +19,7 @@ import {
   ShieldCheck,
   ExternalLink,
   Mail,
+  Share2,
 } from 'lucide-react'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 
@@ -256,6 +257,14 @@ export default function PatientRegistration() {
     toast.success('Patient details copied to clipboard!')
   }
 
+  const handleShareWhatsApp = () => {
+    if (!credentialsModal) return
+    const phoneDigits = credentialsModal.phone.replace(/\D/g, '')
+    const portalUrl = `${window.location.origin}/login?portal=patient`
+    const text = `Welcome to Prasad Dental Care!\n\nDear ${credentialsModal.name},\nYour patient account has been created.\n\n• Patient ID: ${credentialsModal.patientId}\n• Mobile: ${credentialsModal.phone}\n${credentialsModal.email ? `• Login Email: ${credentialsModal.email}\n` : ''}${credentialsModal.password ? `• Temporary Password: ${credentialsModal.password}\n` : ''}• Patient Portal: ${portalUrl}\n\nPlease keep your Patient ID safe to log in and view your appointments and prescriptions.`
+    window.open(`https://wa.me/${phoneDigits}?text=${encodeURIComponent(text)}`, '_blank')
+  }
+
   const handleResendEmail = async () => {
     if (!credentialsModal || sendCredentialsState === 'sending' || !credentialsModal.email) return
 
@@ -282,13 +291,15 @@ export default function PatientRegistration() {
       } else {
         setSendCredentialsState('failed')
         setSendCredentialsError(emailRes.error || 'Unable to deliver email.')
-        toast.error('Could not send Patient ID email.')
+        toast.error('Could not send email. Use WhatsApp or Copy Details.')
+        handleCopyCredentials()
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Unable to send email.'
       setSendCredentialsState('failed')
       setSendCredentialsError(message)
-      toast.error('Could not send Patient ID email.')
+      toast.error('Could not send email. Use WhatsApp or Copy Details.')
+      handleCopyCredentials()
     }
   }
 
@@ -683,23 +694,32 @@ export default function PatientRegistration() {
               </>
             )}
 
-            <div className="flex flex-col sm:flex-row gap-2 pt-2">
+            <div className="grid grid-cols-2 gap-2 pt-2">
               <button
                 type="button"
-                onClick={handleCopyPatientId}
-                className="btn-secondary text-xs flex-1 flex items-center justify-center gap-1.5"
+                onClick={handleShareWhatsApp}
+                className="btn-secondary text-xs py-2 flex items-center justify-center gap-1.5 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border-emerald-200 font-semibold"
+                title="Send credentials directly to patient on WhatsApp"
               >
-                <Copy className="h-4 w-4" /> Copy ID
+                <Share2 className="h-4 w-4 text-emerald-600" /> WhatsApp
+              </button>
+              <button
+                type="button"
+                onClick={handleCopyCredentials}
+                className="btn-secondary text-xs py-2 flex items-center justify-center gap-1.5 text-gray-700 hover:bg-gray-100"
+                title="Copy full patient credentials to clipboard"
+              >
+                <Copy className="h-4 w-4" /> Copy Details
               </button>
               {credentialsModal.email && (
                 <button
                   type="button"
                   onClick={handleResendEmail}
                   disabled={sendCredentialsState === 'sending'}
-                  className="btn-secondary text-xs flex-1 flex items-center justify-center gap-1.5"
+                  className="btn-secondary text-xs py-2 flex items-center justify-center gap-1.5"
                 >
                   <Mail className="h-4 w-4" />
-                  {sendCredentialsState === 'sending' ? 'Sending...' : 'Resend ID Email'}
+                  {sendCredentialsState === 'sending' ? 'Sending...' : 'Resend Email'}
                 </button>
               )}
               <button
@@ -709,7 +729,7 @@ export default function PatientRegistration() {
                   setCredentialsModal(null)
                   navigate(`/reception/patients/${id}`)
                 }}
-                className="btn-primary text-xs flex-1 flex items-center justify-center gap-1.5"
+                className={`btn-primary text-xs py-2 flex items-center justify-center gap-1.5 ${!credentialsModal.email ? 'col-span-2' : ''}`}
               >
                 <ExternalLink className="h-4 w-4" /> View Profile
               </button>

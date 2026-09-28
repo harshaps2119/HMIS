@@ -1,3 +1,4 @@
+import { supabase } from '../lib/supabase'
 import { logAction } from './auditService'
 import { UserRole } from '../types'
 import { CLINIC_CONFIG } from '../utils/constants'
@@ -59,7 +60,7 @@ export async function sendPatientIdEmail(
   const body = formatPatientIdEmailBody(params.patientName, params.patientId, portalUrl)
 
   try {
-    // Attempt delivery via secure backend API route if configured
+    // 1. Attempt delivery via secure backend Resend API route if configured
     const response = await fetch('/api/send-patient-email', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -71,41 +72,51 @@ export async function sendPatientIdEmail(
         patientId: params.patientId,
       }),
     }).catch(err => {
-      // Network/route error — backend endpoint may not be active in dev/test
       return { ok: false, statusText: err instanceof Error ? err.message : 'Network error' } as Response
     })
 
-    if (!response.ok) {
-      const errorMsg = `Email service unavailable or unconfigured (${response.status || 'offline'}).`
+    if (response.ok) {
       if (params.performedBy) {
         await logAction({
           userId: params.performedBy.userId,
           userRole: params.performedBy.userRole,
           userName: params.performedBy.userName,
-          action: 'patient_id_email_failed',
+          action: isResend ? 'patient_id_email_resent' : 'patient_id_email_sent',
           targetId: params.patientId,
           targetType: 'patient',
-          description: `Failed to deliver Patient ID email to ${params.email}: ${errorMsg}`,
+          description: `Delivered Patient ID email to ${params.email} via Resend service`,
         })
       }
-      return { success: false, error: errorMsg }
+      return { success: true }
     }
 
-    if (params.performedBy) {
-      await logAction({
-        userId: params.performedBy.userId,
-        userRole: params.performedBy.userRole,
-        userName: params.performedBy.userName,
-        action: isResend ? 'patient_id_email_resent' : 'patient_id_email_sent',
-        targetId: params.patientId,
-        targetType: 'patient',
-        description: `${isResend ? 'Resent' : 'Sent'} Patient ID (${params.patientId}) welcome email to ${params.email}`,
+    // 2. Fallback: Attempt Supabase Auth's native password setup/recovery email
+    try {
+      const redirectUrl = typeof window !== 'undefined' ? `${window.location.origin}/set-password?portal=patient` : portalUrl
+      const { error: sbErr } = await supabase.auth.resetPasswordForEmail(params.email, {
+        redirectTo: redirectUrl,
       })
+
+      if (!sbErr) {
+        if (params.performedBy) {
+          await logAction({
+            userId: params.performedBy.userId,
+            userRole: params.performedBy.userRole,
+            userName: params.performedBy.userName,
+            action: isResend ? 'patient_id_email_resent' : 'patient_id_email_sent',
+            targetId: params.patientId,
+            targetType: 'patient',
+            description: `Delivered password setup email to ${params.email} via Supabase Auth mailer`,
+          })
+        }
+        return { success: true }
+      }
+    } catch {
+      // Supabase native email failed
     }
 
-    return { success: true }
-  } catch (err: unknown) {
-    const errorMsg = err instanceof Error ? err.message : 'Unexpected email delivery failure'
+    // 3. Informative error message guiding configuration
+    const errorMsg = 'Email service unconfigured. Add RESEND_API_KEY in Vercel settings, or copy the login link directly via WhatsApp/Clipboard.'
     if (params.performedBy) {
       await logAction({
         userId: params.performedBy.userId,
@@ -117,6 +128,9 @@ export async function sendPatientIdEmail(
         description: `Failed to deliver Patient ID email to ${params.email}: ${errorMsg}`,
       })
     }
+    return { success: false, error: errorMsg }
+  } catch (err: unknown) {
+    const errorMsg = err instanceof Error ? err.message : 'Failed to send email.'
     return { success: false, error: errorMsg }
   }
 }
