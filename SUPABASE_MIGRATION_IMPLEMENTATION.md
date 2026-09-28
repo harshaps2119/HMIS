@@ -132,7 +132,7 @@ No `service_role` key, database password, or auth bridge URL is exposed in the f
    - In Supabase Dashboard → Authentication → Users, invite the clinic administrator email.
    - Run the initial role update in SQL Editor:
      ```sql
-     UPDATE public.users SET role = 'admin', name = 'Clinic Admin', phone = '+919999999999' WHERE email = '<admin-email>';
+     UPDATE public.users SET role = 'admin', name = 'Clinic Admin', phone = '+918328456378' WHERE email = '<admin-email>';
      ```
 3. **Decommissioning Firebase Files:**
    - `src/firebase/config.ts` and Firestore config files are kept intact in the repository for record-keeping and non-destructive transition. Once clinical testing in Supabase confirms 100% operational sign-off, they can be safely removed.

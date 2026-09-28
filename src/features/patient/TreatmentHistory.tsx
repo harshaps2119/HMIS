@@ -17,13 +17,14 @@ export default function PatientTreatmentHistory() {
 
   useEffect(() => {
     const load = async () => {
-      if (!userProfile?.phone) {
+      const identifier = userProfile?.phone || userProfile?.patientId
+      if (!identifier) {
         setLoading(false)
         return
       }
       setLoading(true)
       try {
-        const list = await getPatientConsultations(userProfile.phone)
+        const list = await getPatientConsultations(identifier)
         setConsultations(list)
       } catch (err) {
         console.error(err)

@@ -5,7 +5,7 @@ import { createPatient, provisionPatientAccount } from '../../services/patientSe
 import { sendPatientIdEmail } from '../../services/emailService'
 import { logAction } from '../../services/auditService'
 import { useAuth } from '../../contexts/AuthContext'
-import { getFirebaseErrorMessage } from '../../utils/errorUtils'
+import { getErrorMessage } from '../../utils/errorUtils'
 import { normalizePhoneNumber, isValidIndianMobile, maskPhoneNumber } from '../../utils/phoneUtils'
 import {
   ArrowLeft,
@@ -234,7 +234,7 @@ export default function PatientRegistration() {
       })
     } catch (err: unknown) {
       console.error('Registration failed:', err)
-      setError(getFirebaseErrorMessage(err))
+      setError(getErrorMessage(err))
     } finally {
       setLoading(false)
     }

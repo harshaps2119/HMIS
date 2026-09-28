@@ -19,7 +19,7 @@ function ConfigurationError({ details }: { details: string }) {
   return (
     <main className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
       <section className="w-full max-w-xl rounded-2xl border border-red-200 bg-white p-8 shadow-lg">
-        <h1 className="text-2xl font-bold text-gray-900">DentalCare HMIS configuration required</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Prasad Dental Care HMIS configuration required</h1>
         <p className="mt-3 text-sm leading-6 text-gray-600">{details}</p>
         {missingEnvironmentKeys.length > 0 && (
           <div className="mt-5 rounded-lg bg-red-50 p-4 text-sm text-red-800">

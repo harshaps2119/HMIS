@@ -7,6 +7,7 @@ import { requestPatientAppointment } from '../../services/appointmentService'
 import { UserProfile, TreatmentItem, VisitType, Patient } from '../../types'
 import { Calendar, Clock, Stethoscope, FileText, X } from 'lucide-react'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
+import { CLINIC_CONFIG } from '../../utils/constants'
 
 interface BookAppointmentModalProps {
   isOpen: boolean
@@ -58,10 +59,10 @@ export default function BookAppointmentModal({
           const defaultDoc: UserProfile = {
             id: 'd0000000-0000-0000-0000-000000000002',
             uid: 'd0000000-0000-0000-0000-000000000002',
-            name: 'Dr. Hemanth Kumar',
-            phone: '+918328456378',
+            name: CLINIC_CONFIG.doctor.name,
+            phone: `+91${CLINIC_CONFIG.doctor.phone}`,
             role: 'doctor',
-            specialization: 'BDS, MDS – Orthodontics',
+            specialization: CLINIC_CONFIG.doctor.qualifications,
             active: true,
             createdAt: new Date().toISOString(),
           }

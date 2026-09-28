@@ -25,14 +25,23 @@ export default function PatientPrescriptionDetail() {
         const rx = await getPrescription(id)
         if (!rx) {
           setPrescription(null)
-        } else if (
-          userProfile &&
-          normalizePhoneNumber(rx.patientPhone || rx.uhid) !== normalizePhoneNumber(userProfile.phone)
-        ) {
-          // Security isolation check: Patient can only view their own prescription
-          setAccessDenied(true)
         } else {
-          setPrescription(rx)
+          const matchesPhone = Boolean(
+            userProfile?.phone &&
+            rx.patientPhone &&
+            normalizePhoneNumber(rx.patientPhone) === normalizePhoneNumber(userProfile.phone)
+          )
+          const matchesPatientId = Boolean(
+            userProfile?.patientId &&
+            (rx.uhid === userProfile.patientId || (rx as any).patientId === userProfile.patientId)
+          )
+
+          if (userProfile && !matchesPhone && !matchesPatientId) {
+            // Security isolation check: Patient can only view their own prescription
+            setAccessDenied(true)
+          } else {
+            setPrescription(rx)
+          }
         }
       } catch (err) {
         console.error(err)

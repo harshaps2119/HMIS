@@ -27,7 +27,7 @@ import {
   INITIAL_MEDICATION_MASTER,
   MEDICATION_SOURCE_DISCLAIMER,
 } from '../../utils/medicationMasterData'
-import { getFirebaseErrorMessage } from '../../utils/errorUtils'
+import { getErrorMessage } from '../../utils/errorUtils'
 import { normalizePhoneNumber } from '../../utils/phoneUtils'
 import {
   ArrowLeft, Plus, Trash2, CheckCircle, FileText,
@@ -416,7 +416,7 @@ export default function ConsultationForm() {
         navigate(`/doctor/consultations/${consultId}`)
       }
     } catch (err) {
-      toast.error(getFirebaseErrorMessage(err))
+      toast.error(getErrorMessage(err))
     } finally {
       setSaving(false)
     }

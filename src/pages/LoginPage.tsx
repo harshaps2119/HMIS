@@ -17,7 +17,7 @@ import {
   Mail,
 } from 'lucide-react'
 import LoadingSpinner from '../components/ui/LoadingSpinner'
-import { CLINIC_NAME, CLINIC_ADDRESS, CLINIC_PHONE } from '../utils/constants'
+import { CLINIC_CONFIG } from '../utils/constants'
 
 const roleDashboard: Record<UserRole, string> = {
   receptionist: '/reception/dashboard',
@@ -181,11 +181,11 @@ export default function LoginPage() {
         {/* Clinic Identity & Official Logo */}
         <div className="text-center mb-6">
           <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-white shadow-md p-1.5 mb-3 border border-gray-100">
-            <img src="/logo.jpg" alt={CLINIC_NAME} className="w-full h-full object-contain rounded-xl" />
+            <img src={CLINIC_CONFIG.logo} alt={CLINIC_CONFIG.name} className="w-full h-full object-contain rounded-xl" />
           </div>
-          <h1 className="text-xl font-bold text-gray-900">{CLINIC_NAME}</h1>
-          <p className="text-xs text-gray-500 mt-0.5">{CLINIC_ADDRESS}</p>
-          <p className="text-xs text-teal-700 font-medium">Contact: {CLINIC_PHONE}</p>
+          <h1 className="text-xl font-bold text-gray-900">{CLINIC_CONFIG.name}</h1>
+          <p className="text-xs text-gray-500 mt-0.5">{CLINIC_CONFIG.address}</p>
+          <p className="text-xs text-teal-700 font-medium">Contact: {CLINIC_CONFIG.phone}</p>
         </div>
 
         {/* Portal Authentication Card */}

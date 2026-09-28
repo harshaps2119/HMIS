@@ -37,6 +37,7 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-# OS
+# OS & Office
 .DS_Store
 Thumbs.db
+~$*

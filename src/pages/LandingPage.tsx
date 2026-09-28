@@ -15,7 +15,7 @@ import {
   MapPin,
   Lock,
 } from 'lucide-react'
-import { CLINIC_NAME, CLINIC_ADDRESS, CLINIC_PHONE, CLINIC_EMAIL } from '../utils/constants'
+import { CLINIC_CONFIG } from '../utils/constants'
 
 const roleDashboard: Record<UserRole, string> = {
   receptionist: '/reception/dashboard',
@@ -47,14 +47,14 @@ export default function LandingPage() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-white border border-gray-200 p-1 flex items-center justify-center shrink-0 shadow-sm">
-              <img src="/logo.jpg" alt={CLINIC_NAME} className="w-full h-full object-contain rounded-lg" />
+              <img src={CLINIC_CONFIG.logo} alt={CLINIC_CONFIG.name} className="w-full h-full object-contain rounded-lg" />
             </div>
             <div>
               <span className="text-lg font-bold text-gray-900 tracking-tight block leading-tight">
-                {CLINIC_NAME}
+                {CLINIC_CONFIG.name}
               </span>
               <span className="text-xs text-teal-700 font-medium tracking-wide uppercase">
-                Dr. Hemanth Kumar · BDS, MDS – Orthodontics
+                {CLINIC_CONFIG.doctor.name} · {CLINIC_CONFIG.doctor.qualifications}
               </span>
             </div>
           </div>
@@ -62,11 +62,11 @@ export default function LandingPage() {
           <div className="hidden md:flex items-center gap-6 text-xs text-gray-500 font-medium">
             <div className="flex items-center gap-1.5">
               <Phone className="h-3.5 w-3.5 text-teal-600" />
-              <span>{CLINIC_PHONE}</span>
+              <span>{CLINIC_CONFIG.phone}</span>
             </div>
             <div className="flex items-center gap-1.5">
               <MapPin className="h-3.5 w-3.5 text-teal-600" />
-              <span className="truncate max-w-[220px]">{CLINIC_ADDRESS}</span>
+              <span className="truncate max-w-[220px]">{CLINIC_CONFIG.address}</span>
             </div>
           </div>
         </div>
@@ -81,7 +81,7 @@ export default function LandingPage() {
             <span>Secure Role-Based Health Records</span>
           </div>
           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-gray-900 tracking-tight leading-tight">
-            Welcome to <span className="text-teal-700">{CLINIC_NAME}</span>
+            Welcome to <span className="text-teal-700">{CLINIC_CONFIG.name}</span>
           </h1>
           <p className="mt-4 text-base sm:text-lg text-gray-600 leading-relaxed">
             Choose how you want to continue. Please select the appropriate portal to sign in or register.
@@ -216,9 +216,9 @@ export default function LandingPage() {
       <footer className="w-full border-t border-gray-200 bg-white/70 py-6 text-xs text-gray-500">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
           <div>
-            <p className="font-semibold text-gray-800">{CLINIC_NAME} &bull; Dr. Hemanth Kumar (BDS, MDS – Orthodontics)</p>
+            <p className="font-semibold text-gray-800">{CLINIC_CONFIG.name} &bull; {CLINIC_CONFIG.doctor.name} ({CLINIC_CONFIG.doctor.qualifications})</p>
             <p className="text-gray-500 mt-0.5">
-              {CLINIC_ADDRESS} &bull; Contact: {CLINIC_PHONE}
+              {CLINIC_CONFIG.address} &bull; Contact: {CLINIC_CONFIG.phone}
             </p>
           </div>
           <div className="flex items-center gap-2 text-gray-400">

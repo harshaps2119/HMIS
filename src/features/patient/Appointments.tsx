@@ -1,4 +1,4 @@
-﻿import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { getPatientAppointments } from '../../services/appointmentService'
 import { getPatient } from '../../services/patientService'
@@ -21,15 +21,16 @@ export default function PatientAppointments() {
   const [isBookingOpen, setIsBookingOpen] = useState(false)
 
   const loadData = useCallback(async () => {
-    if (!userProfile?.phone) {
+    const identifier = userProfile?.phone || userProfile?.patientId
+    if (!identifier) {
       setLoading(false)
       return
     }
     setLoading(true)
     try {
       const [appts, p] = await Promise.all([
-        getPatientAppointments(userProfile.phone),
-        getPatient(userProfile.phone),
+        getPatientAppointments(identifier),
+        getPatient(identifier),
       ])
       setAppointments(appts || [])
       setPatient(p)

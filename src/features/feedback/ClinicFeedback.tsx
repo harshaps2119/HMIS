@@ -5,6 +5,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { Star, Send, ArrowLeft, CheckCircle, MessageSquare } from 'lucide-react'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import toast from 'react-hot-toast'
+import { CLINIC_NAME } from '../../utils/constants'
 
 const FEATURE_LIST = [
   'Patient Registration with OTP & Mobile UHID',
@@ -74,7 +75,7 @@ export default function ClinicFeedback() {
             <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded bg-teal-50 text-teal-800 text-xs font-semibold mb-2">
               <MessageSquare className="h-3.5 w-3.5" /> Clinic Review & Evaluation Form
             </div>
-            <h1 className="text-2xl font-bold text-gray-900">DentalCare HMIS Usability Review</h1>
+            <h1 className="text-2xl font-bold text-gray-900">{CLINIC_NAME} Usability Review</h1>
             <p className="text-xs text-gray-500 mt-1">
               For clinic staff and doctors reviewing the digital patient record and prescription system.
             </p>

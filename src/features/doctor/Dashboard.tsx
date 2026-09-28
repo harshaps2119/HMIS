@@ -15,8 +15,7 @@ import SearchInput from '../../components/ui/SearchInput'
 import EmptyState from '../../components/ui/EmptyState'
 import { format } from 'date-fns'
 import { normalizePhoneNumber } from '../../utils/phoneUtils'
-
-import { CLINIC_NAME } from '../../utils/constants'
+import { CLINIC_CONFIG } from '../../utils/constants'
 
 export default function DoctorDashboard() {
   const { userProfile, currentUser } = useAuth()
@@ -92,12 +91,12 @@ export default function DoctorDashboard() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-gray-200/80 shadow-xs">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 rounded-xl bg-white border border-gray-200 p-1 flex items-center justify-center shrink-0 shadow-xs">
-            <img src="/logo.jpg" alt={CLINIC_NAME} className="w-full h-full object-contain rounded-lg" />
+            <img src={CLINIC_CONFIG.logo} alt={CLINIC_CONFIG.name} className="w-full h-full object-contain rounded-lg" />
           </div>
           <div>
             <div className="flex items-center gap-2">
               <span className="text-[11px] font-bold uppercase tracking-wider text-teal-700 bg-teal-50 px-2 py-0.5 rounded-full border border-teal-100">
-                {CLINIC_NAME}
+                {CLINIC_CONFIG.name}
               </span>
             </div>
             <h1 className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">

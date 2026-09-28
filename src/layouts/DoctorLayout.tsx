@@ -6,7 +6,7 @@ import toast from 'react-hot-toast'
 import {
   LayoutDashboard, Users, LogOut, Menu, X, Stethoscope, ChevronDown,
 } from 'lucide-react'
-import { CLINIC_NAME } from '../utils/constants'
+import { CLINIC_CONFIG } from '../utils/constants'
 
 const navLinks = [
   { to: '/doctor/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -40,10 +40,10 @@ export default function DoctorLayout() {
       >
         <div className="flex items-center gap-3 px-6 py-5 border-b border-gray-200">
           <div className="w-10 h-10 rounded-xl bg-white border border-gray-200 p-1 flex items-center justify-center shrink-0 shadow-sm">
-            <img src="/logo.jpg" alt={CLINIC_NAME} className="w-full h-full object-contain rounded-lg" />
+            <img src={CLINIC_CONFIG.logo} alt={CLINIC_CONFIG.name} className="w-full h-full object-contain rounded-lg" />
           </div>
           <div className="min-w-0">
-            <p className="text-sm font-bold text-gray-900 truncate">{CLINIC_NAME}</p>
+            <p className="text-sm font-bold text-gray-900 truncate">{CLINIC_CONFIG.name}</p>
             <p className="text-xs text-gray-500">Doctor Portal</p>
           </div>
         </div>
@@ -77,7 +77,7 @@ export default function DoctorLayout() {
           <button className="lg:hidden p-2 rounded-lg hover:bg-gray-100" onClick={() => setSidebarOpen(!sidebarOpen)}>
             {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
-          <h1 className="text-sm font-semibold text-gray-500 lg:hidden">{CLINIC_NAME}</h1>
+          <h1 className="text-sm font-semibold text-gray-500 lg:hidden">{CLINIC_CONFIG.name}</h1>
           <div className="flex items-center gap-3 ml-auto">
             <div className="relative">
               <button

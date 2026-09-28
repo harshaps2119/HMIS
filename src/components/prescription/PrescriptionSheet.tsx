@@ -1,12 +1,7 @@
 import { Prescription } from '../../types'
 import { formatDate } from '../../utils/dateUtils'
 import { maskPhoneNumber } from '../../utils/phoneUtils'
-import {
-  CLINIC_NAME,
-  CLINIC_ADDRESS,
-  CLINIC_PHONE,
-  CLINIC_EMAIL,
-} from '../../utils/constants'
+import { CLINIC_CONFIG } from '../../utils/constants'
 import { Stethoscope, Calendar } from 'lucide-react'
 
 interface PrescriptionSheetProps {
@@ -28,17 +23,17 @@ export default function PrescriptionSheet({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b-2 border-teal-600 pb-6 gap-4">
         <div className="flex items-center gap-3">
           <div className="w-14 h-14 rounded-xl bg-white border border-gray-200 p-1 flex items-center justify-center shrink-0 shadow-xs">
-            <img src="/logo.jpg" alt={CLINIC_NAME} className="w-full h-full object-contain rounded-lg" />
+            <img src={CLINIC_CONFIG.logo} alt={CLINIC_CONFIG.name} className="w-full h-full object-contain rounded-lg" />
           </div>
           <div>
-            <h1 className="text-2xl font-black text-gray-900 tracking-tight">{CLINIC_NAME}</h1>
-            <p className="text-xs text-teal-800 font-semibold">Dr. Hemanth Kumar · BDS, MDS – Orthodontics</p>
-            <p className="text-xs text-gray-400 mt-0.5">{CLINIC_ADDRESS}</p>
+            <h1 className="text-2xl font-black text-gray-900 tracking-tight">{CLINIC_CONFIG.name}</h1>
+            <p className="text-xs text-teal-800 font-semibold">{CLINIC_CONFIG.doctor.name} · {CLINIC_CONFIG.doctor.qualifications}</p>
+            <p className="text-xs text-gray-400 mt-0.5">{CLINIC_CONFIG.address}</p>
           </div>
         </div>
         <div className="text-left sm:text-right text-xs text-gray-500">
-          <p className="font-semibold text-gray-800">Phone: {CLINIC_PHONE}</p>
-          <p>Email: {CLINIC_EMAIL}</p>
+          <p className="font-semibold text-gray-800">Phone: {CLINIC_CONFIG.phone}</p>
+          <p>Email: {CLINIC_CONFIG.email}</p>
           <p className="text-teal-700 font-bold mt-1">Rx ID: #{prescription.id.slice(0, 8).toUpperCase()}</p>
         </div>
       </div>
@@ -155,7 +150,7 @@ export default function PrescriptionSheet({
       {/* DOCTOR SIGNATURE BLOCK */}
       <div className="flex justify-between items-end pt-8 border-t border-gray-200 mt-12">
         <div className="text-[11px] text-gray-400 max-w-xs">
-          <p>Digital Prescription · {CLINIC_NAME}</p>
+          <p>Digital Prescription · {CLINIC_CONFIG.name}</p>
           <p className="mt-0.5">Retain this document for your medical records and follow-up consultations.</p>
         </div>
         <div className="text-right">

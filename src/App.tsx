@@ -106,6 +106,7 @@ export default function App() {
         }>
           <Route index element={<Navigate to="/admin/staff" replace />} />
           <Route path="staff" element={<StaffManagement />} />
+          <Route path="test-patients" element={<TestPatientManager />} />
         </Route>
 
         {/* Doctor Routes */}

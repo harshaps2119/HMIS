@@ -61,7 +61,7 @@ export default function DoctorPatientSummary() {
           </button>
           <div>
             <h1 className="text-2xl font-bold text-gray-900">{patient.name}</h1>
-            <p className="text-xs text-gray-500 font-mono">UHID: {patient.uhid}</p>
+            <p className="text-xs text-gray-500 font-mono">Patient ID: {patient.patientId || patient.uhid}</p>
           </div>
         </div>
         <button

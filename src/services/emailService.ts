@@ -1,11 +1,6 @@
 import { logAction } from './auditService'
 import { UserRole } from '../types'
-import {
-  CLINIC_NAME,
-  CLINIC_ADDRESS,
-  CLINIC_PHONE,
-  DEFAULT_DOCTOR_NAME,
-} from '../utils/constants'
+import { CLINIC_CONFIG } from '../utils/constants'
 
 export interface PatientIdEmailParams {
   patientName: string
@@ -30,7 +25,7 @@ export interface EmailSendResult {
 export function formatPatientIdEmailBody(patientName: string, patientId: string, portalUrl: string): string {
   return `Dear ${patientName},
 
-Welcome to ${CLINIC_NAME}.
+Welcome to ${CLINIC_CONFIG.name}.
 
 Your patient account has been successfully created.
 
@@ -45,10 +40,10 @@ ${portalUrl}
 Please keep your Patient ID safe for future appointments and access to your health information.
 
 Regards,
-${DEFAULT_DOCTOR_NAME}
-${CLINIC_NAME}
-${CLINIC_ADDRESS}
-Contact: ${CLINIC_PHONE}`
+${CLINIC_CONFIG.doctor.name}
+${CLINIC_CONFIG.name}
+${CLINIC_CONFIG.address}
+Contact: ${CLINIC_CONFIG.phone}`
 }
 
 /**
@@ -60,7 +55,7 @@ export async function sendPatientIdEmail(
   isResend = false
 ): Promise<EmailSendResult> {
   const portalUrl = params.portalUrl || (typeof window !== 'undefined' ? `${window.location.origin}/login?portal=patient` : 'https://hmis-wine.vercel.app/login?portal=patient')
-  const subject = `Welcome to ${CLINIC_NAME} – Your Patient ID`
+  const subject = `Welcome to ${CLINIC_CONFIG.name} – Your Patient ID`
   const body = formatPatientIdEmailBody(params.patientName, params.patientId, portalUrl)
 
   try {

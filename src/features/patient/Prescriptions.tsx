@@ -16,13 +16,14 @@ export default function PatientPrescriptions() {
 
   useEffect(() => {
     const load = async () => {
-      if (!userProfile?.phone) {
+      const identifier = userProfile?.phone || userProfile?.patientId
+      if (!identifier) {
         setLoading(false)
         return
       }
       setLoading(true)
       try {
-        const list = await getPatientPrescriptions(userProfile.phone)
+        const list = await getPatientPrescriptions(identifier)
         setPrescriptions(list || [])
       } catch (err) {
         console.error(err)

@@ -47,7 +47,7 @@ export async function signIn(email: string, password: string): Promise<AuthUser>
 }
 
 /**
- * Public self-registration is disabled in DentalCare HMIS.
+ * Public self-registration is disabled in Prasad Dental Care HMIS.
  * Patient accounts are provisioned exclusively by clinic staff (Admin/Receptionist)
  * through the secure provisionPatientAccount procedure.
  */

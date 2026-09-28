@@ -1,5 +1,5 @@
 /**
- * Standard Phone Utilities for DentalCare HMIS
+ * Standard Phone Utilities for Prasad Dental Care HMIS
  *
  * All patient phone numbers / UHIDs must strictly conform to E.164 format:
  * +91XXXXXXXXXX (10-digit Indian mobile with +91 country prefix, no spaces or hyphens)

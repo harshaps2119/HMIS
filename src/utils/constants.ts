@@ -82,3 +82,20 @@ export const DEFAULT_DOCTOR_SPECIALIZATION = 'Orthodontics'
 export const DEFAULT_DOCTOR_PHONE = '8328456378'
 export const DEFAULT_DOCTOR_EMAIL = 'hemanth.kumar@prasaddentalcare.com'
 export const PATIENT_ID_PREFIX = 'PDC'
+
+export const CLINIC_CONFIG = {
+  name: CLINIC_NAME,
+  address: CLINIC_ADDRESS,
+  phone: CLINIC_PHONE,
+  email: CLINIC_EMAIL,
+  logo: '/logo.jpg',
+  doctor: {
+    name: DEFAULT_DOCTOR_NAME,
+    qualifications: DEFAULT_DOCTOR_QUALIFICATIONS,
+    specialization: DEFAULT_DOCTOR_SPECIALIZATION,
+    phone: DEFAULT_DOCTOR_PHONE,
+    email: DEFAULT_DOCTOR_EMAIL,
+  },
+  patientIdPrefix: PATIENT_ID_PREFIX,
+} as const
+

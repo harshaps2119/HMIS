@@ -6,11 +6,13 @@ import { getPatientAppointments } from '../../services/appointmentService'
 import { getPatientUserByPhone } from '../../services/userService'
 import { sendPatientIdEmail } from '../../services/emailService'
 import { useAuth } from '../../contexts/AuthContext'
+import { supabase } from '../../lib/supabase'
+import { logAction } from '../../services/auditService'
 import { Patient, Appointment, UserProfile } from '../../types'
 import { formatDate, formatTime } from '../../utils/dateUtils'
 import {
   Phone, Mail, MapPin, AlertTriangle, Calendar,
-  ArrowLeft, Plus, ShieldCheck, Key, Copy, RefreshCw, CheckCircle, Hash,
+  ArrowLeft, Plus, ShieldCheck, Key, Copy, RefreshCw, CheckCircle, Hash, Trash2,
 } from 'lucide-react'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import ErrorState from '../../components/ui/ErrorState'
@@ -44,6 +46,13 @@ export default function PatientDetail() {
     password: string
     patientId: string
   } | null>(null)
+
+  // Delete patient state (Admin only)
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
+  const [deleteConfirmName, setDeleteConfirmName] = useState('')
+  const [deleting, setDeleting] = useState(false)
+
+  const isAdmin = userProfile?.role === 'admin'
 
   const loadPatientData = async () => {
     if (!patientRecordId) return
@@ -116,6 +125,48 @@ export default function PatientDetail() {
       toast.error(msg)
     } finally {
       setSendingEmail(false)
+    }
+  }
+
+  const handleDeletePatient = async () => {
+    if (!patient || !isAdmin) return
+    if (deleteConfirmName.trim().toLowerCase() !== patient.name.trim().toLowerCase()) {
+      toast.error('Patient name does not match confirmation.')
+      return
+    }
+
+    setDeleting(true)
+    try {
+      const { error: rpcErr } = await supabase.rpc('delete_test_patient', {
+        p_patient_id: patient.id,
+      })
+      if (rpcErr) throw rpcErr
+
+      if (currentUser && userProfile) {
+        try {
+          await logAction({
+            userId: currentUser.uid,
+            userRole: userProfile.role,
+            userName: userProfile.name,
+            action: 'patient_deleted',
+            targetId: patient.id,
+            targetType: 'patient',
+            description: `Admin deleted patient: ${patient.name} (Patient ID: ${patient.patientId || patient.uhid})`,
+          })
+        } catch {
+          // Non-fatal audit log warning
+        }
+      }
+
+      toast.success(`Patient "${patient.name}" has been permanently deleted.`)
+      setIsDeleteModalOpen(false)
+      navigate('/reception/patients')
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Deletion failed'
+      toast.error(`Delete failed: ${msg}`)
+      console.error('Delete patient error:', err)
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -225,20 +276,35 @@ export default function PatientDetail() {
             </button>
           </div>
         </div>
-        <button
-          onClick={() =>
-            navigate(
-              `/reception/appointments/new?patientRecordId=${encodeURIComponent(
-                patient.id
-              )}&patientName=${encodeURIComponent(
-                patient.name
-              )}&patientPhone=${encodeURIComponent(patient.phone)}`
-            )
-          }
-          className="btn-primary"
-        >
-          <Plus className="h-4 w-4" /> New Appointment
-        </button>
+        <div className="flex items-center gap-2">
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={() => {
+                setDeleteConfirmName('')
+                setIsDeleteModalOpen(true)
+              }}
+              className="btn-secondary text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300 flex items-center gap-1.5"
+            >
+              <Trash2 className="h-4 w-4 text-red-500" />
+              <span>Delete Patient</span>
+            </button>
+          )}
+          <button
+            onClick={() =>
+              navigate(
+                `/reception/appointments/new?patientRecordId=${encodeURIComponent(
+                  patient.id
+                )}&patientName=${encodeURIComponent(
+                  patient.name
+                )}&patientPhone=${encodeURIComponent(patient.phone)}`
+              )
+            }
+            className="btn-primary"
+          >
+            <Plus className="h-4 w-4" /> New Appointment
+          </button>
+        </div>
       </div>
 
       <div className="grid lg:grid-cols-3 gap-6">
@@ -539,6 +605,85 @@ export default function PatientDetail() {
                 </div>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Delete Patient Confirmation Modal (Admin only) */}
+      {isAdmin && isDeleteModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95">
+            <div className="flex items-center gap-3 text-red-700">
+              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+                <AlertTriangle className="h-6 w-6 text-red-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-gray-900">Delete Patient Record</h3>
+                <p className="text-xs text-red-600 font-semibold">Destructive Action &bull; Irreversible</p>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-xs text-red-800 space-y-1.5">
+              <p className="font-bold">Warning: This action cannot be undone!</p>
+              <p>
+                Deleting <strong>{patient.name}</strong> ({displayPatientId}) will permanently remove:
+              </p>
+              <ul className="list-disc pl-5 space-y-0.5 text-red-700">
+                <li>Patient demographic profile</li>
+                <li>All appointments &amp; consultation history</li>
+                <li>All medical prescriptions</li>
+                <li>Patient Portal login credentials &amp; auth identity</li>
+              </ul>
+              <p className="text-[11px] text-gray-500 pt-1">
+                Note: Legal audit logs are preserved for compliance.
+              </p>
+            </div>
+
+            <div>
+              <label className="form-label text-xs">
+                To confirm deletion, please type the patient's exact name:{' '}
+                <strong className="text-gray-900 select-all font-mono">{patient.name}</strong>
+              </label>
+              <input
+                type="text"
+                value={deleteConfirmName}
+                onChange={e => setDeleteConfirmName(e.target.value)}
+                placeholder={patient.name}
+                className="form-input text-xs border-red-300 focus:ring-red-500"
+                autoFocus
+              />
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsDeleteModalOpen(false)
+                  setDeleteConfirmName('')
+                }}
+                disabled={deleting}
+                className="btn-secondary text-xs flex-1"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeletePatient}
+                disabled={
+                  deleting ||
+                  deleteConfirmName.trim().toLowerCase() !== patient.name.trim().toLowerCase()
+                }
+                className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex-1"
+              >
+                {deleting ? (
+                  <LoadingSpinner size="sm" />
+                ) : (
+                  <>
+                    <Trash2 className="h-4 w-4" /> Delete Patient
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

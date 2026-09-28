@@ -238,7 +238,7 @@ Row Level Security is enabled on all 9 tables:
    - Go to **Authentication** → **Users** → **Invite User**, enter your email.
    - In SQL Editor, run:
      ```sql
-     UPDATE public.users SET role = 'admin', name = 'Clinic Admin', phone = '+919999999999' WHERE email = '<your-invited-email>';
+     UPDATE public.users SET role = 'admin', name = 'Clinic Admin', phone = '+918328456378' WHERE email = '<your-invited-email>';
      ```
 4. **Start Application:**
    ```powershell

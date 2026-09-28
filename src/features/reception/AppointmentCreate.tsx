@@ -10,7 +10,7 @@ import {
 import { getTreatments } from '../../services/treatmentService'
 import { logAction } from '../../services/auditService'
 import { useAuth } from '../../contexts/AuthContext'
-import { getFirebaseErrorMessage } from '../../utils/errorUtils'
+import { getErrorMessage } from '../../utils/errorUtils'
 import { UserProfile, Patient, VisitType, TreatmentItem } from '../../types'
 import { ArrowLeft, Calendar, Search, X, Info } from 'lucide-react'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
@@ -171,7 +171,7 @@ export default function AppointmentCreate() {
       toast.success('Appointment scheduled successfully!')
       navigate('/reception/appointments')
     } catch (err) {
-      toast.error(getFirebaseErrorMessage(err))
+      toast.error(getErrorMessage(err))
     } finally {
       setLoading(false)
     }

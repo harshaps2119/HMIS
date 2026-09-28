@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────
-// DentalCare HMIS — Application Types
+// Prasad Dental Care HMIS — Application Types
 // Supabase PostgreSQL backend (no Firebase Timestamp dependency)
 // ─────────────────────────────────────────────────────────────
 
