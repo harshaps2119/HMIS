@@ -161,6 +161,56 @@ export async function getTodaysAppointmentsByDoctor(
   return (data || []).map(mapAppointmentRow)
 }
 
+export async function getActiveAppointmentsByDoctor(
+  doctorId: string
+): Promise<Appointment[]> {
+  const { data, error } = await supabase
+    .from('appointments')
+    .select('*')
+    .eq('doctor_id', doctorId)
+    .in('status', ['scheduled', 'checked-in', 'waiting', 'in-consultation'])
+    .order('date', { ascending: true })
+    .order('time', { ascending: true })
+
+  if (error) throw error
+  return (data || []).map(mapAppointmentRow)
+}
+
+export async function getAllActiveAppointments(): Promise<Appointment[]> {
+  const { data, error } = await supabase
+    .from('appointments')
+    .select('*')
+    .in('status', ['scheduled', 'checked-in', 'waiting', 'in-consultation'])
+    .order('date', { ascending: true })
+    .order('time', { ascending: true })
+
+  if (error) throw error
+  return (data || []).map(mapAppointmentRow)
+}
+
+export async function getAppointmentsByDate(date: string): Promise<Appointment[]> {
+  const { data, error } = await supabase
+    .from('appointments')
+    .select('*')
+    .eq('date', date)
+    .order('time', { ascending: true })
+
+  if (error) throw error
+  return (data || []).map(mapAppointmentRow)
+}
+
+export async function getRecentAppointments(limit = 20): Promise<Appointment[]> {
+  const { data, error } = await supabase
+    .from('appointments')
+    .select('*')
+    .order('date', { ascending: false })
+    .order('time', { ascending: false })
+    .limit(limit)
+
+  if (error) throw error
+  return (data || []).map(mapAppointmentRow)
+}
+
 /**
  * Retrieve appointments for a patient by phone or patientId.
  */

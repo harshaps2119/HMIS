@@ -3,6 +3,9 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import {
   getTodaysAppointments,
+  getAllActiveAppointments,
+  getAppointmentsByDate,
+  getRecentAppointments,
   updateAppointmentStatus,
   getAppointmentRequests,
   confirmAppointmentRequest,
@@ -16,7 +19,8 @@ import { Appointment, AppointmentStatus, UserProfile } from '../../types'
 import { todayISO, formatTime, formatDate } from '../../utils/dateUtils'
 import {
   Calendar, Plus, RefreshCw, Clock, CheckCircle, XCircle,
-  AlertCircle, Stethoscope, User, Phone, Check, X, ArrowRight
+  AlertCircle, Stethoscope, User, Phone, Check, X, ArrowRight,
+  Filter, Activity
 } from 'lucide-react'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import StatusBadge from '../../components/ui/StatusBadge'
@@ -79,15 +83,30 @@ export default function AppointmentQueue() {
   // Reject Form
   const [rejectReason, setRejectReason] = useState('')
 
+  const [queueFilter, setQueueFilter] = useState<'active-all' | 'today' | 'all' | 'date'>('active-all')
+  const [selectedDate, setSelectedDate] = useState<string>(todayISO())
+
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      const [todayAppts, pendingReqs, docList] = await Promise.all([
-        getTodaysAppointments(todayISO()),
+      let apptsPromise: Promise<Appointment[]>
+      if (queueFilter === 'today') {
+        apptsPromise = getTodaysAppointments(todayISO())
+      } else if (queueFilter === 'date') {
+        apptsPromise = getAppointmentsByDate(selectedDate)
+      } else if (queueFilter === 'all') {
+        apptsPromise = getRecentAppointments(50)
+      } else {
+        // active-all (default)
+        apptsPromise = getAllActiveAppointments()
+      }
+
+      const [loadedAppts, pendingReqs, docList] = await Promise.all([
+        apptsPromise,
         getAppointmentRequests(),
         getDoctors(),
       ])
-      setAppointments(todayAppts || [])
+      setAppointments(loadedAppts || [])
       setRequests(pendingReqs || [])
       setDoctors(docList || [])
     } catch {
@@ -95,7 +114,7 @@ export default function AppointmentQueue() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [queueFilter, selectedDate])
 
   useEffect(() => {
     loadData()
@@ -428,11 +447,78 @@ export default function AppointmentQueue() {
           )}
         </div>
       ) : (
-        /* TODAY'S CLINIC QUEUE SECTION */
-        <>
+        /* CLINIC QUEUE SECTION */
+        <div className="space-y-4">
+          {/* Queue Filter Bar */}
+          <div className="flex flex-wrap items-center justify-between gap-3 p-4 bg-white rounded-xl border border-gray-200 shadow-xs">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Queue:</span>
+              <button
+                type="button"
+                onClick={() => setQueueFilter('active-all')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 ${
+                  queueFilter === 'active-all'
+                    ? 'bg-teal-600 text-white shadow-xs'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                <Activity className="h-3.5 w-3.5" />
+                All Active Queue
+              </button>
+              <button
+                type="button"
+                onClick={() => setQueueFilter('today')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 ${
+                  queueFilter === 'today'
+                    ? 'bg-teal-600 text-white shadow-xs'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                <Calendar className="h-3.5 w-3.5" />
+                Today ({formatDate(todayISO())})
+              </button>
+              <button
+                type="button"
+                onClick={() => setQueueFilter('all')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                  queueFilter === 'all'
+                    ? 'bg-teal-600 text-white shadow-xs'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                Recent History (50)
+              </button>
+            </div>
+
+            <div className="flex items-center gap-1.5 bg-gray-100 px-2.5 py-1.5 rounded-lg">
+              <Filter className="h-3.5 w-3.5 text-gray-500" />
+              <span className="text-xs text-gray-500 font-medium">Pick Date:</span>
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={e => {
+                  setSelectedDate(e.target.value)
+                  setQueueFilter('date')
+                }}
+                className="bg-transparent text-xs text-gray-800 font-semibold focus:outline-none cursor-pointer"
+              />
+            </div>
+          </div>
+
           {/* Active Queue */}
           <div className="card p-6">
-            <h2 className="font-semibold text-gray-900 mb-4">In Queue & Active ({grouped.active.length})</h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-semibold text-gray-900">
+                {queueFilter === 'active-all'
+                  ? 'All Active Patient Queue'
+                  : queueFilter === 'today'
+                  ? "Today's Active Queue"
+                  : queueFilter === 'date'
+                  ? `Appointments for ${formatDate(selectedDate)}`
+                  : 'Recent Appointments Queue'}{' '}
+                ({grouped.active.length})
+              </h2>
+            </div>
             {grouped.active.length === 0 ? (
               <EmptyState
                 icon={Calendar}
@@ -540,7 +626,7 @@ export default function AppointmentQueue() {
               </div>
             </div>
           )}
-        </>
+        </div>
       )}
 
       {/* CONFIRM MODAL */}

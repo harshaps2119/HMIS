@@ -238,20 +238,68 @@ export async function searchPatientsByPatientId(patientId: string): Promise<Pati
 }
 
 /**
- * Unified patient search supporting Patient ID, Phone, or Name
+ * Unified patient search supporting Patient ID, Phone, Name, or Email
  */
 export async function searchPatients(query: string): Promise<Patient[]> {
   const clean = query.trim()
   if (!clean) return []
-  if (clean.toUpperCase().startsWith('PDC') || (clean.includes('-') && !clean.startsWith('+'))) {
-    return await searchPatientsByPatientId(clean)
+
+  const isEmail = clean.includes('@')
+  const digitsOnly = clean.replace(/\D/g, '')
+  const upper = clean.toUpperCase()
+
+  // 1. If searching by email
+  if (isEmail) {
+    const { data, error } = await supabase
+      .from('patients')
+      .select('*')
+      .ilike('email', `%${clean}%`)
+      .limit(20)
+    if (!error && data && data.length > 0) return data.map(mapPatientRow)
   }
-  const isPhone = /^\d/.test(clean.replace('+', ''))
-  if (isPhone) {
-    const normalized = normalizePhoneNumber(clean)
-    return await searchPatientsByPhone(normalized)
+
+  // 2. Direct Patient ID exact or prefix match
+  if (upper.startsWith('PDC') || (clean.includes('-') && !clean.startsWith('+'))) {
+    const pts = await searchPatientsByPatientId(upper)
+    if (pts.length > 0) return pts
   }
-  return await searchPatientsByName(clean)
+
+  // 3. Multi-field comprehensive search:
+  // Search across name, patient_id, uhid, email, phone
+  const orFilters = [
+    `name.ilike.%${clean}%`,
+    `patient_id.ilike.%${upper}%`,
+    `uhid.ilike.%${upper}%`,
+    `email.ilike.%${clean}%`,
+  ]
+  if (digitsOnly.length >= 3) {
+    orFilters.push(`phone.ilike.%${digitsOnly}%`)
+  }
+
+  const { data, error } = await supabase
+    .from('patients')
+    .select('*')
+    .or(orFilters.join(','))
+    .order('created_at', { ascending: false })
+    .limit(30)
+
+  if (error) {
+    console.error('Unified patient search fallback:', error)
+    return await searchPatientsByName(clean)
+  }
+
+  // Deduplicate by phone & name to ensure unique representation
+  const seen = new Set<string>()
+  const deduped: Patient[] = []
+  for (const row of (data || []).map(mapPatientRow)) {
+    const key = `${row.phone || row.uhid}_${row.name.toLowerCase()}`
+    if (!seen.has(key)) {
+      seen.add(key)
+      deduped.push(row)
+    }
+  }
+
+  return deduped
 }
 
 /**
@@ -319,14 +367,24 @@ export async function resolvePatientLogin(
 /**
  * Retrieve recently registered patients
  */
-export async function getRecentPatients(limitCount = 5): Promise<Patient[]> {
+export async function getRecentPatients(limitCount = 50): Promise<Patient[]> {
   const { data, error } = await supabase
     .from('patients')
     .select('*')
     .order('created_at', { ascending: false })
     .limit(limitCount)
   if (error) throw error
-  return (data || []).map(mapPatientRow)
+
+  const seen = new Set<string>()
+  const deduped: Patient[] = []
+  for (const row of (data || []).map(mapPatientRow)) {
+    const key = `${row.phone || row.uhid}_${row.name.toLowerCase()}`
+    if (!seen.has(key)) {
+      seen.add(key)
+      deduped.push(row)
+    }
+  }
+  return deduped
 }
 
 export interface ProvisionPatientParams {
