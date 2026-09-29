@@ -151,3 +151,14 @@ export async function getDoctorConsultations(
   if (error) throw error
   return (data || []).map(mapConsultationRow)
 }
+
+export async function getAllConsultations(limit = 50): Promise<Consultation[]> {
+  const { data, error } = await supabase
+    .from('consultations')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(limit)
+
+  if (error) throw error
+  return (data || []).map(mapConsultationRow)
+}

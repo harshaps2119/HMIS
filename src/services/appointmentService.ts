@@ -211,6 +211,17 @@ export async function getRecentAppointments(limit = 20): Promise<Appointment[]> 
   return (data || []).map(mapAppointmentRow)
 }
 
+export async function getAllAppointments(limit = 100): Promise<Appointment[]> {
+  const { data, error } = await supabase
+    .from('appointments')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(limit)
+
+  if (error) throw error
+  return (data || []).map(mapAppointmentRow)
+}
+
 /**
  * Retrieve appointments for a patient by phone or patientId.
  */
