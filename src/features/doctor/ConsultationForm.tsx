@@ -3,7 +3,7 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { useAuth } from '../../contexts/AuthContext'
 import { getPatientById, getPatientByPhone } from '../../services/patientService'
-import { updateAppointmentStatus } from '../../services/appointmentService'
+import { updateAppointmentStatus, getAppointment } from '../../services/appointmentService'
 import { createConsultation } from '../../services/consultationService'
 import { createPrescription } from '../../services/prescriptionService'
 import { getMedications, searchMedicationsMaster } from '../../services/medicationService'
@@ -113,6 +113,18 @@ export default function ConsultationForm() {
         } else if (patientPhoneParam) {
           const byPhone = await getPatientByPhone(patientPhoneParam)
           if (byPhone) setPatient(byPhone)
+        } else if (appointmentId && appointmentId !== 'walkin') {
+          const appt = await getAppointment(appointmentId)
+          if (appt) {
+            if (appt.patientRecordId) {
+              const p = await getPatientById(appt.patientRecordId)
+              if (p) setPatient(p)
+            }
+            if (appt.patientPhone) {
+              const byPhone = await getPatientByPhone(appt.patientPhone)
+              if (byPhone) setPatient(byPhone)
+            }
+          }
         }
 
         const [masterMeds, masterTreatments] = await Promise.all([

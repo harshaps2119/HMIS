@@ -112,30 +112,46 @@ export async function getConsultation(id: string): Promise<Consultation | null> 
 }
 
 /**
- * Retrieve patient consultations by phone or patientId.
+ * Retrieve patient consultations by phone or patientId (with optional phone/id fallback).
  */
-export async function getPatientConsultations(phoneOrRecordId: string): Promise<Consultation[]> {
+export async function getPatientConsultations(
+  phoneOrRecordId: string,
+  phoneFallback?: string
+): Promise<Consultation[]> {
   const normalized = normalizePhoneNumber(phoneOrRecordId)
+  const isPhone = normalized.startsWith('+91') && normalized.length === 13
 
-  if (normalized.startsWith('+91') && normalized.length === 13) {
-    const { data, error } = await supabase
-      .from('consultations')
-      .select('*')
-      .eq('patient_phone', normalized)
-      .order('date', { ascending: false })
+  let query = supabase.from('consultations').select('*')
 
-    if (error) throw error
-    return (data || []).map(mapConsultationRow)
+  if (isPhone) {
+    if (phoneFallback) {
+      query = query.or(`patient_phone.eq.${normalized},patient_id.eq.${phoneFallback}`)
+    } else {
+      query = query.eq('patient_phone', normalized)
+    }
+  } else {
+    const fallbackPhone = phoneFallback ? normalizePhoneNumber(phoneFallback) : ''
+    if (fallbackPhone && fallbackPhone.startsWith('+91') && fallbackPhone.length === 13) {
+      query = query.or(`patient_id.eq.${phoneOrRecordId},patient_phone.eq.${fallbackPhone}`)
+    } else {
+      query = query.eq('patient_id', phoneOrRecordId)
+    }
   }
 
-  const { data, error } = await supabase
-    .from('consultations')
-    .select('*')
-    .eq('patient_id', phoneOrRecordId)
-    .order('date', { ascending: false })
-
+  const { data, error } = await query.order('date', { ascending: false })
   if (error) throw error
-  return (data || []).map(mapConsultationRow)
+
+  // Deduplicate by consultation id
+  const seen = new Set<string>()
+  const list: Consultation[] = []
+  for (const row of data || []) {
+    const item = mapConsultationRow(row)
+    if (!seen.has(item.id)) {
+      seen.add(item.id)
+      list.push(item)
+    }
+  }
+  return list
 }
 
 export async function getDoctorConsultations(

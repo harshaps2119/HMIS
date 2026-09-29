@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { getPatientConsultations } from '../../services/consultationService'
-import { Consultation } from '../../types'
+import { getPatient, getPatientByUserId } from '../../services/patientService'
+import { Consultation, Patient } from '../../types'
 import { formatDate } from '../../utils/dateUtils'
 import {
   Clock, CheckCircle, Calendar, User, Stethoscope, ChevronDown, ChevronUp
@@ -10,7 +11,7 @@ import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import EmptyState from '../../components/ui/EmptyState'
 
 export default function PatientTreatmentHistory() {
-  const { userProfile } = useAuth()
+  const { currentUser, userProfile } = useAuth()
   const [consultations, setConsultations] = useState<Consultation[]>([])
   const [loading, setLoading] = useState(true)
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -18,22 +19,33 @@ export default function PatientTreatmentHistory() {
   useEffect(() => {
     const load = async () => {
       const identifier = userProfile?.phone || userProfile?.patientId
-      if (!identifier) {
-        setLoading(false)
-        return
-      }
       setLoading(true)
       try {
-        const list = await getPatientConsultations(identifier)
-        setConsultations(list)
+        let p: Patient | null = null
+        if (identifier) {
+          p = await getPatient(identifier)
+        }
+        if (!p && currentUser?.uid) {
+          p = await getPatientByUserId(currentUser.uid)
+        }
+
+        const lookupId = p?.id || identifier || ''
+        const contactPhone = p?.phone || userProfile?.phone || ''
+
+        if (lookupId) {
+          const list = await getPatientConsultations(lookupId, contactPhone)
+          setConsultations(list)
+        } else {
+          setConsultations([])
+        }
       } catch (err) {
-        console.error(err)
+        console.error('Failed to load consultation history:', err)
       } finally {
         setLoading(false)
       }
     }
     load()
-  }, [userProfile])
+  }, [currentUser, userProfile])
 
   const toggleExpand = (id: string) => {
     setExpandedId(prev => prev === id ? null : id)

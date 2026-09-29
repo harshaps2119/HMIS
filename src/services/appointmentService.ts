@@ -223,30 +223,49 @@ export async function getAllAppointments(limit = 100): Promise<Appointment[]> {
 }
 
 /**
- * Retrieve appointments for a patient by phone or patientId.
+ * Retrieve appointments for a patient by phone or patientId (with optional phone/id fallback).
  */
-export async function getPatientAppointments(phoneOrRecordId: string): Promise<Appointment[]> {
+export async function getPatientAppointments(
+  phoneOrRecordId: string,
+  phoneFallback?: string
+): Promise<Appointment[]> {
   const normalized = normalizePhoneNumber(phoneOrRecordId)
+  const isPhone = normalized.startsWith('+91') && normalized.length === 13
 
-  if (normalized.startsWith('+91') && normalized.length === 13) {
-    const { data, error } = await supabase
-      .from('appointments')
-      .select('*')
-      .eq('patient_phone', normalized)
-      .order('date', { ascending: false })
+  let query = supabase.from('appointments').select('*')
 
-    if (error) throw error
-    return (data || []).map(mapAppointmentRow)
+  if (isPhone) {
+    if (phoneFallback) {
+      query = query.or(`patient_phone.eq.${normalized},patient_id.eq.${phoneFallback}`)
+    } else {
+      query = query.eq('patient_phone', normalized)
+    }
+  } else {
+    const fallbackPhone = phoneFallback ? normalizePhoneNumber(phoneFallback) : ''
+    if (fallbackPhone && fallbackPhone.startsWith('+91') && fallbackPhone.length === 13) {
+      query = query.or(`patient_id.eq.${phoneOrRecordId},patient_phone.eq.${fallbackPhone}`)
+    } else {
+      query = query.eq('patient_id', phoneOrRecordId)
+    }
   }
 
-  const { data, error } = await supabase
-    .from('appointments')
-    .select('*')
-    .eq('patient_id', phoneOrRecordId)
+  const { data, error } = await query
     .order('date', { ascending: false })
+    .order('time', { ascending: false })
 
   if (error) throw error
-  return (data || []).map(mapAppointmentRow)
+
+  // Deduplicate by appointment id
+  const seen = new Set<string>()
+  const list: Appointment[] = []
+  for (const row of data || []) {
+    const appt = mapAppointmentRow(row)
+    if (!seen.has(appt.id)) {
+      seen.add(appt.id)
+      list.push(appt)
+    }
+  }
+  return list
 }
 
 /**

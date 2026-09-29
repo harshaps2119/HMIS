@@ -2,14 +2,15 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { getPatientPrescriptions } from '../../services/prescriptionService'
-import { Prescription } from '../../types'
+import { getPatient, getPatientByUserId } from '../../services/patientService'
+import { Prescription, Patient } from '../../types'
 import { formatDate } from '../../utils/dateUtils'
 import { FileText, Download, Calendar, User, Eye, Pill } from 'lucide-react'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import EmptyState from '../../components/ui/EmptyState'
 
 export default function PatientPrescriptions() {
-  const { userProfile } = useAuth()
+  const { currentUser, userProfile } = useAuth()
   const navigate = useNavigate()
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([])
   const [loading, setLoading] = useState(true)
@@ -17,22 +18,33 @@ export default function PatientPrescriptions() {
   useEffect(() => {
     const load = async () => {
       const identifier = userProfile?.phone || userProfile?.patientId
-      if (!identifier) {
-        setLoading(false)
-        return
-      }
       setLoading(true)
       try {
-        const list = await getPatientPrescriptions(identifier)
-        setPrescriptions(list || [])
+        let p: Patient | null = null
+        if (identifier) {
+          p = await getPatient(identifier)
+        }
+        if (!p && currentUser?.uid) {
+          p = await getPatientByUserId(currentUser.uid)
+        }
+
+        const lookupId = p?.id || identifier || ''
+        const contactPhone = p?.phone || userProfile?.phone || ''
+
+        if (lookupId) {
+          const list = await getPatientPrescriptions(lookupId, contactPhone)
+          setPrescriptions(list || [])
+        } else {
+          setPrescriptions([])
+        }
       } catch (err) {
-        console.error(err)
+        console.error('Failed to load prescriptions:', err)
       } finally {
         setLoading(false)
       }
     }
     load()
-  }, [userProfile])
+  }, [currentUser, userProfile])
 
   if (loading) return <LoadingSpinner className="py-16" />
 

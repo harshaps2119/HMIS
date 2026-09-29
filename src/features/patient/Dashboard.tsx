@@ -101,10 +101,11 @@ export default function PatientDashboard() {
 
       setPatient(p)
 
+      const contactPhone = p.phone || userProfile.phone
       const [appts, consults, rxs] = await Promise.all([
-        getPatientAppointments(p.id),
-        getPatientConsultations(p.id),
-        getPatientPrescriptions(p.id),
+        getPatientAppointments(p.id, contactPhone),
+        getPatientConsultations(p.id, contactPhone),
+        getPatientPrescriptions(p.id, contactPhone),
       ])
       setAppointments(appts || [])
       setConsultations(consults || [])

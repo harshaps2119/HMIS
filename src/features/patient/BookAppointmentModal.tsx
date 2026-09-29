@@ -57,8 +57,8 @@ export default function BookAppointmentModal({
         } else {
           // Fallback primary doctor if database doctors not yet loaded
           const defaultDoc: UserProfile = {
-            id: 'd0000000-0000-0000-0000-000000000002',
-            uid: 'd0000000-0000-0000-0000-000000000002',
+            id: '3aea3449-8ab7-4f84-88f9-61dd8d1bbc1b',
+            uid: '3aea3449-8ab7-4f84-88f9-61dd8d1bbc1b',
             name: CLINIC_CONFIG.doctor.name,
             phone: `+91${CLINIC_CONFIG.doctor.phone}`,
             role: 'doctor',
@@ -85,7 +85,8 @@ export default function BookAppointmentModal({
     e.preventDefault()
     setError('')
 
-    if (!patient?.id || !userProfile?.phone) {
+    const contactPhone = userProfile?.phone || patient?.phone
+    if (!patient?.id || !contactPhone) {
       setError('Your patient profile must have a linked mobile number before requesting an appointment.')
       return
     }
@@ -106,8 +107,8 @@ export default function BookAppointmentModal({
       await requestPatientAppointment(
         {
           patientId: patient.id,
-          patientPhone: userProfile.phone,
-          patientName: patient.name || userProfile.name,
+          patientPhone: contactPhone,
+          patientName: patient.name || userProfile?.name || 'Patient',
           doctorId: selectedDoc.id,
           doctorName: selectedDoc.name,
           date: form.date,
@@ -117,7 +118,7 @@ export default function BookAppointmentModal({
           expectedTreatment: form.expectedTreatment || undefined,
           notes: form.notes.trim() || undefined,
         },
-        currentUser?.uid || userProfile.id
+        currentUser?.uid || userProfile?.id || ''
       )
 
       toast.success('Appointment request submitted! Clinic reception will review and confirm your slot.')

@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { getPatientAppointments } from '../../services/appointmentService'
-import { getPatient } from '../../services/patientService'
+import { getPatient, getPatientByUserId } from '../../services/patientService'
 import { Appointment, Patient } from '../../types'
 import { formatDate, formatTime, isAppointmentPast } from '../../utils/dateUtils'
 import { Calendar, Clock, User, Plus } from 'lucide-react'
@@ -13,7 +13,7 @@ import BookAppointmentModal from './BookAppointmentModal'
 type TabType = 'upcoming' | 'requested' | 'past' | 'cancelled'
 
 export default function PatientAppointments() {
-  const { userProfile } = useAuth()
+  const { currentUser, userProfile } = useAuth()
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [patient, setPatient] = useState<Patient | null>(null)
   const [loading, setLoading] = useState(true)
@@ -22,24 +22,33 @@ export default function PatientAppointments() {
 
   const loadData = useCallback(async () => {
     const identifier = userProfile?.phone || userProfile?.patientId
-    if (!identifier) {
-      setLoading(false)
-      return
-    }
     setLoading(true)
     try {
-      const [appts, p] = await Promise.all([
-        getPatientAppointments(identifier),
-        getPatient(identifier),
-      ])
-      setAppointments(appts || [])
+      let p: Patient | null = null
+      if (identifier) {
+        p = await getPatient(identifier)
+      }
+      if (!p && currentUser?.uid) {
+        p = await getPatientByUserId(currentUser.uid)
+      }
+
       setPatient(p)
+
+      const lookupId = p?.id || identifier || ''
+      const contactPhone = p?.phone || userProfile?.phone || ''
+
+      if (lookupId) {
+        const appts = await getPatientAppointments(lookupId, contactPhone)
+        setAppointments(appts || [])
+      } else {
+        setAppointments([])
+      }
     } catch (err) {
-      console.error(err)
+      console.error('Failed to load appointments:', err)
     } finally {
       setLoading(false)
     }
-  }, [userProfile])
+  }, [currentUser, userProfile])
 
   useEffect(() => {
     loadData()

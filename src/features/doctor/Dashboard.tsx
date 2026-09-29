@@ -38,8 +38,8 @@ export default function DoctorDashboard() {
   const [doctors, setDoctors] = useState<UserProfile[]>([])
   const [selectedDoctorId, setSelectedDoctorId] = useState<string>('')
 
-  // View Filter: 'today' | 'active-queue' | 'date'
-  const [scheduleFilter, setScheduleFilter] = useState<'today' | 'active-queue' | 'date'>('today')
+  // View Filter: 'active-queue' | 'today' | 'date'
+  const [scheduleFilter, setScheduleFilter] = useState<'today' | 'active-queue' | 'date'>('active-queue')
   const [selectedDate, setSelectedDate] = useState<string>(todayISO())
 
   // Patient Quick Search
@@ -82,17 +82,14 @@ export default function DoctorDashboard() {
       if (scheduleFilter === 'active-queue') {
         appts = activeList
       } else if (scheduleFilter === 'date') {
-        const { data: dateAppts } = await (async () => {
-          const list = await getAppointmentsByDate(selectedDate)
-          return { data: list.filter(a => a.doctorId === docId) }
-        })()
-        appts = dateAppts || []
+        const list = await getAppointmentsByDate(selectedDate)
+        appts = list.filter(a => a.doctorId === docId)
       } else {
         // Today
         appts = await getTodaysAppointmentsByDoctor(docId, todayISO())
-        // If today has zero, but there are active appointments on recent/future dates, auto-fallback gracefully
+        // If today has zero, but there are active appointments on other dates, auto-fallback gracefully
         if (appts.length === 0 && activeList.length > 0) {
-          // Keep today as current filter, but activeList is available to alert
+          appts = activeList
         }
       }
 

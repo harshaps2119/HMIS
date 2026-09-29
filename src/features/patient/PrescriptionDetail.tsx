@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { getPrescription } from '../../services/prescriptionService'
+import { getPatientByUserId } from '../../services/patientService'
 import { useAuth } from '../../contexts/AuthContext'
 import { Prescription } from '../../types'
 import { ArrowLeft, Printer, AlertCircle } from 'lucide-react'
@@ -12,7 +13,7 @@ import { normalizePhoneNumber } from '../../utils/phoneUtils'
 export default function PatientPrescriptionDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { userProfile } = useAuth()
+  const { currentUser, userProfile } = useAuth()
 
   const [prescription, setPrescription] = useState<Prescription | null>(null)
   const [loading, setLoading] = useState(true)
@@ -26,17 +27,38 @@ export default function PatientPrescriptionDetail() {
         if (!rx) {
           setPrescription(null)
         } else {
-          const matchesPhone = Boolean(
-            userProfile?.phone &&
-            rx.patientPhone &&
-            normalizePhoneNumber(rx.patientPhone) === normalizePhoneNumber(userProfile.phone)
-          )
-          const matchesPatientId = Boolean(
-            userProfile?.patientId &&
-            (rx.uhid === userProfile.patientId || (rx as any).patientId === userProfile.patientId)
+          const isStaff = Boolean(
+            userProfile?.role && ['admin', 'doctor', 'receptionist'].includes(userProfile.role)
           )
 
-          if (userProfile && !matchesPhone && !matchesPatientId) {
+          let isAllowed = isStaff
+          if (!isAllowed) {
+            const matchesPhone = Boolean(
+              userProfile?.phone &&
+              rx.patientPhone &&
+              normalizePhoneNumber(rx.patientPhone) === normalizePhoneNumber(userProfile.phone)
+            )
+            const matchesPatientId = Boolean(
+              userProfile?.patientId &&
+              (rx.uhid === userProfile.patientId || (rx as any).patientId === userProfile.patientId)
+            )
+            if (matchesPhone || matchesPatientId) {
+              isAllowed = true
+            } else if (currentUser?.uid) {
+              const p = await getPatientByUserId(currentUser.uid)
+              if (p) {
+                const pPhoneMatches = Boolean(
+                  p.phone && rx.patientPhone && normalizePhoneNumber(rx.patientPhone) === normalizePhoneNumber(p.phone)
+                )
+                const pIdMatches = Boolean(
+                  p.id && (rx.patientId === p.id || (rx as any).patientRecordId === p.id)
+                )
+                if (pPhoneMatches || pIdMatches) isAllowed = true
+              }
+            }
+          }
+
+          if (userProfile && !isAllowed) {
             // Security isolation check: Patient can only view their own prescription
             setAccessDenied(true)
           } else {

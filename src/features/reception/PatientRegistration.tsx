@@ -20,6 +20,7 @@ import {
   ExternalLink,
   Mail,
   Share2,
+  Calendar,
 } from 'lucide-react'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 
@@ -727,9 +728,20 @@ export default function PatientRegistration() {
                 onClick={() => {
                   const id = credentialsModal.patientId
                   setCredentialsModal(null)
+                  navigate(`/reception/appointments/new?patientRecordId=${id}`)
+                }}
+                className="btn-primary bg-teal-600 hover:bg-teal-700 text-xs py-2 flex items-center justify-center gap-1.5 font-bold shadow-xs"
+              >
+                <Calendar className="h-4 w-4" /> Book Appointment
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const id = credentialsModal.patientId
+                  setCredentialsModal(null)
                   navigate(`/reception/patients/${id}`)
                 }}
-                className={`btn-primary text-xs py-2 flex items-center justify-center gap-1.5 ${!credentialsModal.email ? 'col-span-2' : ''}`}
+                className="btn-secondary text-xs py-2 flex items-center justify-center gap-1.5 text-gray-700 hover:bg-gray-100"
               >
                 <ExternalLink className="h-4 w-4" /> View Profile
               </button>

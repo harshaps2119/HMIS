@@ -6,6 +6,9 @@ import {
   getAppointmentRequests,
   getAllActiveAppointments,
   getAllAppointments,
+  rescheduleAppointment,
+  confirmAppointmentRequest,
+  rejectAppointmentRequest,
 } from '../../services/appointmentService'
 import { getAllConsultations } from '../../services/consultationService'
 import { getDoctors } from '../../services/userService'
@@ -14,12 +17,19 @@ import { Appointment, Consultation, UserProfile } from '../../types'
 import {
   Calendar, Users, Clock, CheckCircle, Plus,
   Search, ClipboardList, TrendingUp, ArrowRight, Bell, Activity,
-  Stethoscope, Filter, FileText, Check, ShieldCheck, UserCheck, XCircle, ChevronRight
+  Stethoscope, Filter, FileText, Check, ShieldCheck, UserCheck, XCircle, ChevronRight, X
 } from 'lucide-react'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import StatusBadge from '../../components/ui/StatusBadge'
+import Modal from '../../components/ui/Modal'
+import toast from 'react-hot-toast'
 import { format } from 'date-fns'
 import { CLINIC_CONFIG } from '../../utils/constants'
+
+const TIME_SLOTS = [
+  '09:30', '10:00', '10:30', '11:00', '11:30', '12:00',
+  '14:30', '15:00', '15:30', '16:00', '16:30', '17:00',
+]
 
 export default function ReceptionDashboard() {
   const { userProfile } = useAuth()
@@ -29,18 +39,26 @@ export default function ReceptionDashboard() {
   const [allAppointments, setAllAppointments] = useState<Appointment[]>([])
   const [todayAppointments, setTodayAppointments] = useState<Appointment[]>([])
   const [activeQueue, setActiveQueue] = useState<Appointment[]>([])
+  const [requests, setRequests] = useState<Appointment[]>([])
   const [consultations, setConsultations] = useState<Consultation[]>([])
   const [doctors, setDoctors] = useState<UserProfile[]>([])
-  const [pendingRequestsCount, setPendingRequestsCount] = useState(0)
   const [loading, setLoading] = useState(true)
 
-  // Filter Tabs: 'all' | 'today' | 'active' | 'completed' | 'consultations'
-  const [activeTab, setActiveTab] = useState<'all' | 'today' | 'active' | 'completed' | 'consultations'>('all')
+  // Filter Tabs: 'all' | 'today' | 'active' | 'online' | 'completed' | 'consultations'
+  const [activeTab, setActiveTab] = useState<'all' | 'today' | 'active' | 'online' | 'completed' | 'consultations'>('all')
 
   // Search & Filtering controls
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedDoctorFilter, setSelectedDoctorFilter] = useState('all')
   const [selectedDateFilter, setSelectedDateFilter] = useState('')
+
+  // Reschedule Modal State
+  const [rescheduleModalAppt, setRescheduleModalAppt] = useState<Appointment | null>(null)
+  const [rescheduleDate, setRescheduleDate] = useState('')
+  const [rescheduleTime, setRescheduleTime] = useState('')
+  const [rescheduleReason, setRescheduleReason] = useState('')
+  const [rescheduling, setRescheduling] = useState(false)
+  const [actionLoadingId, setActionLoadingId] = useState<string | null>(null)
 
   const loadData = async () => {
     setLoading(true)
@@ -57,7 +75,7 @@ export default function ReceptionDashboard() {
       setAllAppointments(allAppts || [])
       setTodayAppointments(todayAppts || [])
       setActiveQueue(allActive || [])
-      setPendingRequestsCount(reqs?.length || 0)
+      setRequests(reqs || [])
       setConsultations(consults || [])
       setDoctors(docList || [])
     } catch (err) {
@@ -70,6 +88,65 @@ export default function ReceptionDashboard() {
   useEffect(() => {
     loadData()
   }, [])
+
+  // Reschedule and request handlers
+  const handleOpenReschedule = (appt: Appointment) => {
+    setRescheduleModalAppt(appt)
+    setRescheduleDate(appt.date || todayISO())
+    setRescheduleTime(appt.time || '10:00')
+    setRescheduleReason('')
+  }
+
+  const handleRescheduleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!rescheduleModalAppt) return
+
+    setRescheduling(true)
+    try {
+      await rescheduleAppointment(
+        rescheduleModalAppt.id,
+        rescheduleDate,
+        rescheduleTime,
+        rescheduleReason.trim() || undefined
+      )
+      toast.success(`Appointment rescheduled to ${formatDate(rescheduleDate)} at ${formatTime(rescheduleTime)}!`)
+      setRescheduleModalAppt(null)
+      await loadData()
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to reschedule appointment')
+    } finally {
+      setRescheduling(false)
+    }
+  }
+
+  const handleConfirmRequest = async (appt: Appointment) => {
+    setActionLoadingId(appt.id)
+    try {
+      await confirmAppointmentRequest(appt.id)
+      toast.success(`Appointment for ${appt.patientName} confirmed!`)
+      await loadData()
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to confirm appointment')
+    } finally {
+      setActionLoadingId(null)
+    }
+  }
+
+  const handleRejectRequest = async (appt: Appointment) => {
+    const reason = window.prompt(`Enter rejection reason for ${appt.patientName}'s request:`, 'Doctor schedule unavailable')
+    if (!reason || !reason.trim()) return
+
+    setActionLoadingId(appt.id)
+    try {
+      await rejectAppointmentRequest(appt.id, reason.trim())
+      toast.success('Appointment request rejected')
+      await loadData()
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to reject appointment')
+    } finally {
+      setActionLoadingId(null)
+    }
+  }
 
   // Counts
   const completedCount = useMemo(
@@ -89,6 +166,8 @@ export default function ReceptionDashboard() {
       list = todayAppointments
     } else if (activeTab === 'active') {
       list = activeQueue
+    } else if (activeTab === 'online') {
+      list = requests
     } else if (activeTab === 'completed') {
       list = allAppointments.filter(a => a.status === 'completed')
     } else {
@@ -147,22 +226,31 @@ export default function ReceptionDashboard() {
 
   const stats = [
     {
-      label: 'Total Appointments',
+      label: 'All Appointments',
       value: allAppointments.length,
       icon: Calendar,
       color: 'bg-purple-600',
       bg: 'bg-purple-50',
       sub: 'All historical records',
-      tabKey: 'all',
+      tabKey: 'all' as const,
+    },
+    {
+      label: 'Online Requests',
+      value: requests.length,
+      icon: Clock,
+      color: 'bg-amber-600',
+      bg: 'bg-amber-50',
+      sub: requests.length > 0 ? `${requests.length} awaiting clinic review` : 'No pending requests',
+      tabKey: 'online' as const,
     },
     {
       label: "Today's Schedule",
       value: todayAppointments.length,
-      icon: Clock,
+      icon: Calendar,
       color: 'bg-blue-600',
       bg: 'bg-blue-50',
       sub: `${todayAppointments.filter(a => a.status === 'completed').length} completed today`,
-      tabKey: 'today',
+      tabKey: 'today' as const,
     },
     {
       label: 'Active Clinic Queue',
@@ -171,16 +259,7 @@ export default function ReceptionDashboard() {
       color: 'bg-teal-600',
       bg: 'bg-teal-50',
       sub: 'Waiting or scheduled',
-      tabKey: 'active',
-    },
-    {
-      label: 'Completed History',
-      value: completedCount,
-      icon: CheckCircle,
-      color: 'bg-emerald-600',
-      bg: 'bg-emerald-50',
-      sub: `${consultations.length} clinical sheets filed`,
-      tabKey: 'completed',
+      tabKey: 'active' as const,
     },
   ]
 
@@ -189,10 +268,10 @@ export default function ReceptionDashboard() {
     { label: 'Patient Directory', icon: Search, action: () => navigate('/reception/patients'), color: 'btn-secondary' },
     { label: 'Schedule Appointment', icon: Calendar, action: () => navigate('/reception/appointments/new'), color: 'btn-secondary' },
     {
-      label: `Online Requests (${pendingRequestsCount})`,
+      label: `Online Requests (${requests.length})`,
       icon: Clock,
-      action: () => navigate('/reception/appointments?tab=requests'),
-      color: pendingRequestsCount > 0 ? 'btn-primary bg-amber-600 hover:bg-amber-700' : 'btn-secondary',
+      action: () => setActiveTab('online'),
+      color: requests.length > 0 ? 'btn-primary bg-amber-600 hover:bg-amber-700' : 'btn-secondary',
     },
   ]
 
@@ -317,6 +396,22 @@ export default function ReceptionDashboard() {
             <span>All Appointments History</span>
             <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${activeTab === 'all' ? 'bg-white/20 text-white' : 'bg-gray-200 text-gray-800'}`}>
               {allAppointments.length}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('online')}
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 ${
+              activeTab === 'online'
+                ? 'bg-amber-600 text-white shadow-xs'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            <Clock className="h-3.5 w-3.5" />
+            <span>Online Requests</span>
+            <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${activeTab === 'online' ? 'bg-white/20 text-white' : 'bg-amber-100 text-amber-900 border border-amber-300'}`}>
+              {requests.length}
             </span>
           </button>
 
@@ -573,21 +668,62 @@ export default function ReceptionDashboard() {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
-                      <button
-                        onClick={() => navigate(`/reception/patients/${encodeURIComponent(appt.patientRecordId || appt.id)}`)}
-                        className="btn-secondary text-xs py-1.5 px-3 flex items-center gap-1 text-gray-700 hover:bg-gray-100"
-                        title="View complete clinical and dental history"
-                      >
-                        <Users className="h-3.5 w-3.5 text-gray-400" /> Patient History
-                      </button>
-                      <button
-                        onClick={() => navigate('/reception/appointments')}
-                        className="btn-secondary text-xs py-1.5 px-3 flex items-center gap-1 text-teal-700 hover:bg-teal-50 border-teal-200"
-                        title="Manage patient status in queue"
-                      >
-                        Queue <ChevronRight className="h-3.5 w-3.5" />
-                      </button>
+                    <div className="flex flex-wrap items-center gap-2 self-end sm:self-auto shrink-0">
+                      {appt.status === 'requested' ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => handleConfirmRequest(appt)}
+                            disabled={actionLoadingId === appt.id}
+                            className="btn-primary bg-emerald-600 hover:bg-emerald-700 text-xs py-1.5 px-3 flex items-center gap-1 font-semibold"
+                          >
+                            <Check className="h-3.5 w-3.5" /> Confirm Slot
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenReschedule(appt)}
+                            disabled={actionLoadingId === appt.id}
+                            className="btn-primary bg-amber-600 hover:bg-amber-700 text-xs py-1.5 px-3 flex items-center gap-1 font-semibold"
+                          >
+                            <Clock className="h-3.5 w-3.5" /> Reschedule
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleRejectRequest(appt)}
+                            disabled={actionLoadingId === appt.id}
+                            className="btn-secondary text-xs py-1.5 px-3 flex items-center gap-1 text-red-600 hover:bg-red-50 border-red-200"
+                          >
+                            <X className="h-3.5 w-3.5" /> Reject
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          {appt.status !== 'completed' && appt.status !== 'cancelled' && (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenReschedule(appt)}
+                              className="btn-secondary text-xs py-1.5 px-3 flex items-center gap-1 text-amber-800 hover:bg-amber-50 border-amber-200"
+                              title="Reschedule appointment slot"
+                            >
+                              <Clock className="h-3.5 w-3.5 text-amber-600" /> Reschedule
+                            </button>
+                          )}
+                          <button
+                            onClick={() => navigate(`/reception/patients/${encodeURIComponent(appt.patientRecordId || appt.id)}`)}
+                            className="btn-secondary text-xs py-1.5 px-3 flex items-center gap-1 text-gray-700 hover:bg-gray-100"
+                            title="View complete clinical and dental history"
+                          >
+                            <Users className="h-3.5 w-3.5 text-gray-400" /> Patient History
+                          </button>
+                          <button
+                            onClick={() => navigate('/reception/appointments')}
+                            className="btn-secondary text-xs py-1.5 px-3 flex items-center gap-1 text-teal-700 hover:bg-teal-50 border-teal-200"
+                            title="Manage patient status in queue"
+                          >
+                            Queue <ChevronRight className="h-3.5 w-3.5" />
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -596,6 +732,77 @@ export default function ReceptionDashboard() {
           </div>
         )}
       </div>
+
+      {/* Reschedule Modal */}
+      {rescheduleModalAppt && (
+        <Modal
+          isOpen={true}
+          onClose={() => setRescheduleModalAppt(null)}
+          title="Reschedule Appointment Slot"
+          size="md"
+        >
+          <form onSubmit={handleRescheduleSubmit} className="space-y-4">
+            <div className="bg-amber-50 p-3.5 rounded-xl border border-amber-200 text-xs text-amber-900 space-y-1">
+              <p className="font-bold text-sm text-gray-900">{rescheduleModalAppt.patientName}</p>
+              <p>Attending Doctor: <strong className="text-gray-800">Dr. {rescheduleModalAppt.doctorName}</strong></p>
+              <p>Current Slot: <strong className="font-mono text-gray-800">{formatDate(rescheduleModalAppt.date)} at {formatTime(rescheduleModalAppt.time)}</strong></p>
+              <p>Reason: <span className="italic">{rescheduleModalAppt.reason}</span></p>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-gray-700">New Appointment Date</label>
+              <input
+                type="date"
+                required
+                value={rescheduleDate}
+                onChange={e => setRescheduleDate(e.target.value)}
+                className="form-input text-xs"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-gray-700">New Time Slot</label>
+              <select
+                value={rescheduleTime}
+                onChange={e => setRescheduleTime(e.target.value)}
+                className="form-input text-xs"
+              >
+                {TIME_SLOTS.map(t => (
+                  <option key={t} value={t}>{formatTime(t)} ({t})</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-gray-700">Reschedule Note (Optional)</label>
+              <input
+                type="text"
+                value={rescheduleReason}
+                onChange={e => setRescheduleReason(e.target.value)}
+                placeholder="e.g. Previous slot unavailable, shifted by clinic"
+                className="form-input text-xs"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => setRescheduleModalAppt(null)}
+                className="btn-secondary text-xs"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={rescheduling}
+                className="btn-primary bg-amber-600 hover:bg-amber-700 text-xs font-bold flex items-center gap-1.5"
+              >
+                {rescheduling ? <LoadingSpinner size="sm" /> : <><Check className="h-3.5 w-3.5" /> Save Reschedule</>}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
     </div>
   )
 }
